@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -471,7 +470,7 @@ export default function LyricSyncApp() {
         <div className="flex items-center gap-2">
           {wakeLock && (
             <Badge variant="outline" className="hidden sm:flex gap-1.5 items-center text-green-600 bg-green-50 border-green-200">
-              <Sun className="w-3 h-3" /> Screen On
+              <Sun className="w-3 h-3" /> 螢幕常亮已開啟
             </Badge>
           )}
           <Button 
@@ -481,24 +480,25 @@ export default function LyricSyncApp() {
             className="gap-2 h-9"
           >
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-            <span className="hidden sm:inline">{isFullscreen ? "Exit Fullscreen" : "Fullscreen"}</span>
+            <span className="hidden sm:inline">{isFullscreen ? "退出全螢幕" : "全螢幕"}</span>
           </Button>
         </div>
       </header>
 
       <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-stretch">
+        {/* Playlist Card */}
         <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur order-2 lg:order-1">
           <div className="p-4 border-b flex flex-col gap-4 bg-muted/30">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold flex items-center gap-2">
-                <ListMusic className="w-4 h-4 text-primary" /> Playlist
+                <ListMusic className="w-4 h-4 text-primary" /> 播放清單
               </h2>
               <div className="flex flex-col items-end">
                 <span className="text-xs text-muted-foreground font-medium">
-                  {isLoadingDB ? "Loading..." : `${playlist.length} Tracks`}
+                  {isLoadingDB ? "載入中..." : `${playlist.length} 首歌曲`}
                 </span>
                 <div className="flex items-center gap-1 text-[9px] text-muted-foreground/60 uppercase font-bold tracking-tighter">
-                  <HardDrive className="w-2.5 h-2.5" /> On Device
+                  <HardDrive className="w-2.5 h-2.5" /> 裝置儲存
                 </div>
               </div>
             </div>
@@ -514,11 +514,11 @@ export default function LyricSyncApp() {
               >
                 {isPlaying ? (
                   <>
-                    <Pause className="w-5 h-5 fill-current" /> Stop
+                    <Pause className="w-5 h-5 fill-current" /> 停止
                   </>
                 ) : (
                   <>
-                    <Play className="w-5 h-5 fill-current" /> Start
+                    <Play className="w-5 h-5 fill-current" /> 開始
                   </>
                 )}
               </Button>
@@ -531,14 +531,14 @@ export default function LyricSyncApp() {
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Upload New Track</DialogTitle>
+                    <DialogTitle>上傳新歌曲</DialogTitle>
                     <DialogDescription>
-                      Add an MP3 and lyrics. Files will be saved locally on your device.
+                      新增 MP3 與歌詞。檔案將儲存在您的裝置本地。
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="mp3">MP3 File *</Label>
+                      <Label htmlFor="mp3">MP3 檔案 *</Label>
                       <Input 
                         id="mp3" 
                         type="file" 
@@ -547,15 +547,15 @@ export default function LyricSyncApp() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="title">Song Title (Optional)</Label>
-                      <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Bohemian Rhapsody" />
+                      <Label htmlFor="title">歌名 (選填，預設為檔名)</Label>
+                      <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="例如：Bohemian Rhapsody" />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="artist">Artist Name (Optional)</Label>
-                      <Input id="artist" value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="e.g. Queen" />
+                      <Label htmlFor="artist">歌手 (選填)</Label>
+                      <Input id="artist" value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="例如：Queen" />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="lyricFile">Lyric File (.txt, .lrc)</Label>
+                      <Label htmlFor="lyricFile">歌詞檔案 (.txt, .lrc)</Label>
                       <Input 
                         id="lyricFile" 
                         type="file" 
@@ -564,13 +564,13 @@ export default function LyricSyncApp() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="lyrics">Or Paste Lyrics</Label>
+                      <Label htmlFor="lyrics">或貼上歌詞</Label>
                       <textarea 
                         id="lyrics" 
                         className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         value={newLyricsText}
                         onChange={e => setNewLyricsText(e.target.value)}
-                        placeholder="Paste lyrics here..."
+                        placeholder="在此貼上歌詞內容..."
                       />
                     </div>
                   </div>
@@ -580,7 +580,7 @@ export default function LyricSyncApp() {
                       disabled={isProcessing || !newMp3File}
                       className="w-full"
                     >
-                      {isProcessing ? "Analyzing..." : "Start AI Sync"}
+                      {isProcessing ? "同步中..." : "開始 AI 同步"}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -591,7 +591,7 @@ export default function LyricSyncApp() {
             {playlist.length === 0 && !isLoadingDB ? (
               <div className="p-12 text-center text-muted-foreground">
                 <Music className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                <p className="text-sm">No tracks added yet.</p>
+                <p className="text-sm">尚未新增歌曲。</p>
               </div>
             ) : (
               playlist.map((track, index) => (
@@ -634,6 +634,7 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
+        {/* Lyric Display Area */}
         <Card 
           onClick={togglePlay}
           className={cn(
@@ -681,10 +682,11 @@ export default function LyricSyncApp() {
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
                       <FileText className="w-16 h-16 mb-4" />
-                      <p className="text-xl max-w-sm">No lyrics found.</p>
+                      <p className="text-xl max-w-sm">找不到歌詞。</p>
                     </div>
                   )}
                 </div>
+                {/* Visual Gradients for scroll focus */}
                 <div 
                   className="absolute top-0 left-0 right-0 h-32 pointer-events-none" 
                   style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }}
@@ -700,15 +702,16 @@ export default function LyricSyncApp() {
               <div className="w-24 h-24 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
                 <Music className="w-12 h-12 text-indigo-400" />
               </div>
-              <h3 className="text-2xl font-bold font-headline">Select a track to start</h3>
+              <h3 className="text-2xl font-bold font-headline">請選擇歌曲開始播放</h3>
             </div>
           )}
         </Card>
 
+        {/* Controls Card */}
         <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md order-3">
           <div className="p-4 border-b bg-muted/30">
             <h2 className="font-semibold flex items-center gap-2">
-              <Info className="w-4 h-4 text-primary" /> Now Playing
+              <Info className="w-4 h-4 text-primary" /> 正在播放
             </h2>
           </div>
           
@@ -723,6 +726,7 @@ export default function LyricSyncApp() {
 
                   <Separator />
 
+                  {/* Progress Control */}
                   <div className="space-y-3">
                     <Slider 
                       value={[currentTime]} 
@@ -737,6 +741,7 @@ export default function LyricSyncApp() {
                     </div>
                   </div>
 
+                  {/* Playback Buttons */}
                   <div className="flex items-center justify-center gap-6">
                     <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => skipTrack('prev')}>
                       <SkipBack className="w-6 h-6" />
@@ -755,16 +760,17 @@ export default function LyricSyncApp() {
 
                   <div className="flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground opacity-70">
                     <Repeat className="w-3 h-3 text-primary" />
-                    <span>Continuous Play Enabled</span>
+                    <span>已開啟連續播放</span>
                   </div>
 
                   <Separator />
 
+                  {/* Settings */}
                   <div className="space-y-6">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-[10px] text-muted-foreground font-bold uppercase">
                         <div className="flex items-center gap-2">
-                          <Volume2 className="w-3 h-3" /> Volume
+                          <Volume2 className="w-3 h-3" /> 音量
                         </div>
                         <span>{Math.round(volume * 100)}%</span>
                       </div>
@@ -774,7 +780,7 @@ export default function LyricSyncApp() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-[10px] text-muted-foreground font-bold uppercase">
                         <div className="flex items-center gap-2">
-                          <Timer className="w-3 h-3" /> Sync Offset
+                          <Timer className="w-3 h-3" /> 同步偏移
                         </div>
                         <Badge variant="secondary" className="px-1.5 h-4 text-[9px] bg-orange-500/10 text-orange-600 border-none">
                           {syncOffset > 0 ? '+' : ''}{syncOffset.toFixed(1)}s
@@ -784,58 +790,61 @@ export default function LyricSyncApp() {
                     </div>
 
                     <div className="space-y-4">
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Visual Settings</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold">視覺設定</p>
                       
+                      {/* Font Size Selector */}
                       <div className="space-y-2">
                         <Label className="text-[10px] flex items-center gap-2 uppercase opacity-70">
-                          <Type className="w-3 h-3" /> Size
+                          <Type className="w-3 h-3" /> 字體大小
                         </Label>
                         <Select value={fontSize} onValueChange={setFontSize}>
                           <SelectTrigger className="w-full h-8 text-xs">
-                            <SelectValue placeholder="Font Size" />
+                            <SelectValue placeholder="字體大小" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="sm">Small</SelectItem>
-                            <SelectItem value="md">Medium</SelectItem>
-                            <SelectItem value="lg">Large</SelectItem>
-                            <SelectItem value="xl">Extra Large</SelectItem>
+                            <SelectItem value="sm">小 (Small)</SelectItem>
+                            <SelectItem value="md">中 (Medium)</SelectItem>
+                            <SelectItem value="lg">大 (Large)</SelectItem>
+                            <SelectItem value="xl">超大 (Extra Large)</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
+                      {/* Active Color Selector */}
                       <div className="space-y-2">
                         <Label className="text-[10px] flex items-center gap-2 uppercase opacity-70">
-                          <Palette className="w-3 h-3" /> Lyric Color
+                          <Palette className="w-3 h-3" /> 歌詞顏色
                         </Label>
                         <Select value={activeColor} onValueChange={setActiveColor}>
                           <SelectTrigger className="w-full h-8 text-xs">
-                            <SelectValue placeholder="Color" />
+                            <SelectValue placeholder="顏色" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="secondary">Teal (Default)</SelectItem>
-                            <SelectItem value="white">Pure White</SelectItem>
-                            <SelectItem value="yellow">Golden Yellow</SelectItem>
-                            <SelectItem value="green">Lime Green</SelectItem>
-                            <SelectItem value="pink">Hot Pink</SelectItem>
-                            <SelectItem value="cyan">Electric Cyan</SelectItem>
+                            <SelectItem value="secondary">青色 (預設)</SelectItem>
+                            <SelectItem value="white">純白色</SelectItem>
+                            <SelectItem value="yellow">金黃色</SelectItem>
+                            <SelectItem value="green">萊姆綠</SelectItem>
+                            <SelectItem value="pink">亮粉色</SelectItem>
+                            <SelectItem value="cyan">電子藍</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
+                      {/* Background Theme Selector */}
                       <div className="space-y-2">
                         <Label className="text-[10px] flex items-center gap-2 uppercase opacity-70">
-                          <Layout className="w-3 h-3" /> Background
+                          <Layout className="w-3 h-3" /> 背景主題
                         </Label>
                         <Select value={bgTheme} onValueChange={setBgTheme}>
                           <SelectTrigger className="w-full h-8 text-xs">
-                            <SelectValue placeholder="Background" />
+                            <SelectValue placeholder="背景主題" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="slate-900">Slate (Default)</SelectItem>
-                            <SelectItem value="black">Pure Black</SelectItem>
-                            <SelectItem value="indigo-950">Midnight Blue</SelectItem>
-                            <SelectItem value="zinc-900">Dark Zinc</SelectItem>
-                            <SelectItem value="rose-950">Deep Burgundy</SelectItem>
+                            <SelectItem value="slate-900">深灰 (預設)</SelectItem>
+                            <SelectItem value="black">純黑</SelectItem>
+                            <SelectItem value="indigo-950">午夜藍</SelectItem>
+                            <SelectItem value="zinc-900">深鐵灰</SelectItem>
+                            <SelectItem value="rose-950">酒紅色</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -844,8 +853,9 @@ export default function LyricSyncApp() {
 
                   <Separator />
 
+                  {/* AI Actions */}
                   <div className="space-y-3">
-                    <p className="text-[10px] text-muted-foreground uppercase font-bold">AI Tools</p>
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">AI 工具</p>
                     <Button 
                       variant="outline" 
                       className="w-full justify-start gap-2 h-9 text-xs" 
@@ -853,14 +863,14 @@ export default function LyricSyncApp() {
                       disabled={isProcessing || !currentTrack.lrcContent}
                     >
                       <Sparkles className="w-3.5 h-3.5 text-orange-500" /> 
-                      {isProcessing ? "Refining..." : "Fine-tune with AI"}
+                      {isProcessing ? "精煉中..." : "使用 AI 優化同步"}
                     </Button>
                   </div>
                 </>
               ) : (
                 <div className="py-20 text-center opacity-30">
                   <Play className="w-12 h-12 mx-auto mb-4" />
-                  <p className="text-xs uppercase font-bold tracking-widest">No Active Track</p>
+                  <p className="text-xs uppercase font-bold tracking-widest">無播放中歌曲</p>
                 </div>
               )}
             </div>
@@ -868,18 +878,19 @@ export default function LyricSyncApp() {
         </Card>
       </main>
 
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!trackToDelete} onOpenChange={(open) => !open && setTrackToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Track?</AlertDialogTitle>
+            <AlertDialogTitle>刪除歌曲？</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the song and lyrics from your device storage. This action cannot be undone.
+              這將永久從您的裝置儲存中移除這首歌曲與歌詞。此操作無法復原。
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+              確認刪除
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
