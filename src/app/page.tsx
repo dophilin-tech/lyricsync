@@ -49,15 +49,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { saveTrackToDB, getAllTracksFromDB, deleteTrackFromDB, TrackData } from "@/lib/db";
 
-interface Track {
-  id: string;
-  title: string;
-  artist: string;
+interface Track extends Omit<TrackData, 'mp3Blob'> {
   audioUrl: string;
-  mp3DataUri: string;
-  lyricsText?: string;
-  lrcContent?: string;
+  mp3DataUri: string; // 用於 AI 處理
   parsedLrc?: LrcLine[];
 }
 
@@ -71,6 +67,7 @@ export default function LyricSyncApp() {
   const [syncOffset, setSyncOffset] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isLoadingDB, setIsLoadingDB] = useState(true);
   
   // Customization states
   const [fontSize, setFontSize] = useState<string>("md");
@@ -87,6 +84,38 @@ export default function LyricSyncApp() {
   const lyricScrollRef = useRef<HTMLDivElement | null>(null);
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
+
+  // 初始化載入資料庫
+  useEffect(() => {
+    const loadTracks = async () => {
+      try {
+        const savedTracks = await getAllTracksFromDB();
+        const tracksWithUrls = await Promise.all(savedTracks.map(async (st) => {
+          const audioUrl = URL.createObjectURL(st.mp3Blob);
+          // 為了讓 AI 修正功能還能運作，我們需要時重新轉換 DataURI (如果需要的話)
+          // 這裡暫時只載入 Blob URL 供播放
+          const mp3DataUri = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(st.mp3Blob);
+          });
+
+          return {
+            ...st,
+            audioUrl,
+            mp3DataUri,
+            parsedLrc: st.lrcContent ? parseLrc(st.lrcContent) : []
+          };
+        }));
+        setPlaylist(tracksWithUrls);
+      } catch (error) {
+        console.error("Failed to load tracks from DB", error);
+      } finally {
+        setIsLoadingDB(false);
+      }
+    };
+    loadTracks();
+  }, []);
 
   useEffect(() => {
     if (audioRef.current) {
@@ -210,14 +239,24 @@ export default function LyricSyncApp() {
         }
       }
 
-      const newTrack: Track = {
-        id: Date.now().toString(),
+      const trackId = Date.now().toString();
+      const trackData: TrackData = {
+        id: trackId,
         title: finalTitle,
         artist: finalArtist,
-        audioUrl,
-        mp3DataUri,
+        mp3Blob: newMp3File,
         lyricsText: lyricsToProcess || (isLrcFile ? lrcContent.replace(/\[.*?\]/g, '') : ""),
         lrcContent,
+        createdAt: Date.now()
+      };
+
+      // 儲存至 IndexedDB
+      await saveTrackToDB(trackData);
+
+      const newTrack: Track = {
+        ...trackData,
+        audioUrl,
+        mp3DataUri,
         parsedLrc
       };
 
@@ -259,6 +298,17 @@ export default function LyricSyncApp() {
         parsedLrc: parseLrc(res.correctedLrcContent)
       };
 
+      // 更新資料庫中的紀錄 (需要 Blob，所以我們從現有 playlist 找或重新抓)
+      // 這裡簡化：我們需要將更新後的 Track 重新存回 DB
+      const dbTracks = await getAllTracksFromDB();
+      const dbTrack = dbTracks.find(t => t.id === currentTrack.id);
+      if (dbTrack) {
+        await saveTrackToDB({
+          ...dbTrack,
+          lrcContent: res.correctedLrcContent
+        });
+      }
+
       const newPlaylist = [...playlist];
       newPlaylist[currentTrackIndex] = updatedTrack;
       setPlaylist(newPlaylist);
@@ -268,6 +318,28 @@ export default function LyricSyncApp() {
       toast({ title: "Refinement Failed", description: "AI sync correction failed.", variant: "destructive" });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteTrack = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await deleteTrackFromDB(id);
+      const indexToRemove = playlist.findIndex(t => t.id === id);
+      const newPlaylist = playlist.filter(t => t.id !== id);
+      
+      setPlaylist(newPlaylist);
+      
+      if (currentTrackIndex === indexToRemove) {
+        setCurrentTrackIndex(-1);
+        setIsPlaying(false);
+      } else if (currentTrackIndex > indexToRemove) {
+        setCurrentTrackIndex(currentTrackIndex - 1);
+      }
+      toast({ title: "Deleted", description: "Track removed from device storage." });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to delete track.", variant: "destructive" });
     }
   };
 
@@ -336,7 +408,7 @@ export default function LyricSyncApp() {
             <DialogHeader>
               <DialogTitle>Upload New Track</DialogTitle>
               <DialogDescription>
-                Add an MP3 and lyrics. We'll automatically use the filename if you don't provide a title.
+                Add an MP3 and lyrics. Files will be saved locally on your device.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -396,13 +468,15 @@ export default function LyricSyncApp() {
             <h2 className="font-semibold flex items-center gap-2">
               <ListMusic className="w-4 h-4 text-primary" /> Playlist
             </h2>
-            <span className="text-xs text-muted-foreground font-medium">{playlist.length} Tracks</span>
+            <span className="text-xs text-muted-foreground font-medium">
+              {isLoadingDB ? "Loading..." : `${playlist.length} Tracks`}
+            </span>
           </div>
           <ScrollArea className="flex-1 min-h-[300px]">
-            {playlist.length === 0 ? (
+            {playlist.length === 0 && !isLoadingDB ? (
               <div className="p-12 text-center text-muted-foreground">
                 <Music className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                <p className="text-sm">No tracks added.</p>
+                <p className="text-sm">No tracks added yet.</p>
               </div>
             ) : (
               playlist.map((track, index) => (
@@ -429,17 +503,7 @@ export default function LyricSyncApp() {
                     variant="ghost" 
                     size="icon" 
                     className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const newPlaylist = playlist.filter(t => t.id !== track.id);
-                      setPlaylist(newPlaylist);
-                      if (currentTrackIndex === index) {
-                        setCurrentTrackIndex(-1);
-                        setIsPlaying(false);
-                      } else if (currentTrackIndex > index) {
-                        setCurrentTrackIndex(currentTrackIndex - 1);
-                      }
-                    }}
+                    onClick={(e) => handleDeleteTrack(track.id, e)}
                   >
                     <Trash2 className="w-3 h-3" />
                   </Button>
@@ -677,3 +741,4 @@ export default function LyricSyncApp() {
     </div>
   );
 }
+
