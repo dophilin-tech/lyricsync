@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -106,25 +107,37 @@ export default function LyricSyncApp() {
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
-  // Handle Screen Wake Lock
+  // Handle Screen Wake Lock with improved reliability
   useEffect(() => {
+    let lock: any = null;
+
     const requestWakeLock = async () => {
       if ('wakeLock' in navigator && isPlaying) {
         try {
-          const lock = await (navigator as any).wakeLock.request('screen');
+          lock = await (navigator as any).wakeLock.request('screen');
           setWakeLock(lock);
           lock.addEventListener('release', () => {
-            setWakeLock(null);
+            if (document.visibilityState === 'visible' && isPlaying) {
+              requestWakeLock(); // Auto-reattain if released unexpectedly while visible
+            } else {
+              setWakeLock(null);
+            }
           });
         } catch (err: any) {
-          // Changed console.error to warn to avoid NextJS crash overlay for permission issues
-          console.warn(`Wake Lock restricted or unavailable: ${err.name}, ${err.message}`);
+          console.warn(`Wake Lock restricted: ${err.name}, ${err.message}`);
         }
+      }
+    };
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && isPlaying) {
+        await requestWakeLock();
       }
     };
 
     if (isPlaying) {
       requestWakeLock();
+      document.addEventListener('visibilitychange', handleVisibilityChange);
     } else {
       if (wakeLock) {
         wakeLock.release().catch(() => {});
@@ -132,16 +145,9 @@ export default function LyricSyncApp() {
       }
     }
 
-    const handleVisibilityChange = async () => {
-      if (wakeLock !== null && document.visibilityState === 'visible' && isPlaying) {
-        requestWakeLock();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (wakeLock) wakeLock.release().catch(() => {});
+      if (lock) lock.release().catch(() => {});
     };
   }, [isPlaying]);
 
@@ -160,7 +166,6 @@ export default function LyricSyncApp() {
         const savedTracks = await getAllTracksFromDB();
         const tracksWithUrls = await Promise.all(savedTracks.map(async (st) => {
           const audioUrl = URL.createObjectURL(st.mp3Blob);
-          // Pre-generate data URI for AI flows if needed
           const mp3DataUri = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
@@ -217,9 +222,7 @@ export default function LyricSyncApp() {
   const togglePlay = () => {
     if (!audioRef.current || !currentTrack) return;
     if (audioRef.current.paused) {
-      // Attempt to go fullscreen on start as requested
       toggleFullscreen(true);
-      
       audioRef.current.play().catch(error => {
         console.warn("Playback failed:", error);
         toast({ title: "Playback Error", description: "Browser blocked audio playback.", variant: "destructive" });
@@ -257,7 +260,6 @@ export default function LyricSyncApp() {
   };
 
   const handleTrackEnded = () => {
-    // Continuous playback logic: move to next and ensure isPlaying stays true
     if (playlist.length > 0) {
       setIsPlaying(true);
       skipTrack('next');
@@ -295,7 +297,6 @@ export default function LyricSyncApp() {
       const audioUrl = URL.createObjectURL(newMp3File);
       const mp3DataUri = await readFileAsDataURL(newMp3File);
       
-      // Auto-title from filename if empty
       const finalTitle = newTitle || newMp3File.name.replace(/\.[^/.]+$/, "");
       const finalArtist = newArtist || "Unknown Artist";
 
@@ -344,7 +345,6 @@ export default function LyricSyncApp() {
         createdAt: Date.now()
       };
 
-      // Save to IndexedDB
       await saveTrackToDB(trackData);
 
       const newTrack: Track = {
@@ -360,7 +360,6 @@ export default function LyricSyncApp() {
         setIsPlaying(true);
       }
       
-      // Reset form
       setNewTitle("");
       setNewArtist("");
       setNewMp3File(null);
@@ -488,7 +487,6 @@ export default function LyricSyncApp() {
       </header>
 
       <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-stretch">
-        {/* Sidebar Left: Playlist & Playback Toggle */}
         <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur order-2 lg:order-1">
           <div className="p-4 border-b flex flex-col gap-4 bg-muted/30">
             <div className="flex items-center justify-between">
@@ -636,7 +634,6 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
-        {/* Center: Lyrics Display (Toggles Play/Pause on click) */}
         <Card 
           onClick={togglePlay}
           className={cn(
@@ -647,7 +644,6 @@ export default function LyricSyncApp() {
         >
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20 pointer-events-none" />
           
-          {/* Overlay Hint */}
           <div className="absolute top-4 right-4 opacity-0 group-hover/lyrics:opacity-20 transition-opacity pointer-events-none">
              {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8" />}
           </div>
@@ -689,7 +685,6 @@ export default function LyricSyncApp() {
                     </div>
                   )}
                 </div>
-                {/* Visual Gradients */}
                 <div 
                   className="absolute top-0 left-0 right-0 h-32 pointer-events-none" 
                   style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }}
@@ -710,7 +705,6 @@ export default function LyricSyncApp() {
           )}
         </Card>
 
-        {/* Sidebar Right: Controls & Fine-tuning */}
         <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md order-3">
           <div className="p-4 border-b bg-muted/30">
             <h2 className="font-semibold flex items-center gap-2">
@@ -874,7 +868,6 @@ export default function LyricSyncApp() {
         </Card>
       </main>
 
-      {/* Deletion confirmation dialog */}
       <AlertDialog open={!!trackToDelete} onOpenChange={(open) => !open && setTrackToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
