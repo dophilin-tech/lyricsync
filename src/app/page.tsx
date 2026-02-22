@@ -13,10 +13,11 @@ import {
   Sparkles, 
   Trash2,
   ListMusic,
-  CheckCircle2,
   Timer,
   Info,
-  Type
+  Type,
+  Palette,
+  Layout
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -47,6 +48,7 @@ import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 interface Track {
   id: string;
@@ -69,7 +71,11 @@ export default function LyricSyncApp() {
   const [syncOffset, setSyncOffset] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [fontSize, setFontSize] = useState<string>("lg");
+  
+  // Customization states
+  const [fontSize, setFontSize] = useState<string>("md");
+  const [activeColor, setActiveColor] = useState<string>("secondary");
+  const [bgTheme, setBgTheme] = useState<string>("slate-900");
 
   const [newTitle, setNewTitle] = useState("");
   const [newArtist, setNewArtist] = useState("");
@@ -167,7 +173,6 @@ export default function LyricSyncApp() {
       const audioUrl = URL.createObjectURL(newMp3File);
       const mp3DataUri = await readFileAsDataURL(newMp3File);
       
-      // Auto-title from filename if not provided
       const finalTitle = newTitle || newMp3File.name.replace(/\.[^/.]+$/, "");
       const finalArtist = newArtist || "Unknown Artist";
 
@@ -284,7 +289,30 @@ export default function LyricSyncApp() {
       case 'md': return 'text-2xl md:text-3xl';
       case 'lg': return 'text-3xl md:text-5xl';
       case 'xl': return 'text-4xl md:text-7xl';
-      default: return 'text-3xl md:text-5xl';
+      default: return 'text-2xl md:text-3xl';
+    }
+  };
+
+  const getActiveColorClass = () => {
+    switch (activeColor) {
+      case 'secondary': return 'text-secondary';
+      case 'white': return 'text-white';
+      case 'yellow': return 'text-yellow-400';
+      case 'green': return 'text-green-400';
+      case 'pink': return 'text-pink-400';
+      case 'cyan': return 'text-cyan-400';
+      default: return 'text-secondary';
+    }
+  };
+
+  const getBgThemeClass = () => {
+    switch (bgTheme) {
+      case 'slate-900': return 'bg-slate-900';
+      case 'black': return 'bg-black';
+      case 'indigo-950': return 'bg-indigo-950';
+      case 'zinc-900': return 'bg-zinc-900';
+      case 'rose-950': return 'bg-rose-950';
+      default: return 'bg-slate-900';
     }
   };
 
@@ -363,7 +391,6 @@ export default function LyricSyncApp() {
       </header>
 
       <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-stretch">
-        {/* Playlist Sidebar */}
         <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur">
           <div className="p-4 border-b flex items-center justify-between bg-muted/30">
             <h2 className="font-semibold flex items-center gap-2">
@@ -422,9 +449,12 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
-        {/* Player & Karaoke Area */}
-        <Card className="lg:col-span-6 h-[650px] relative overflow-hidden border-none shadow-2xl bg-slate-900 text-white rounded-3xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-transparent to-teal-900/40 pointer-events-none" />
+        <Card className={cn(
+          "lg:col-span-6 h-[650px] relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-3xl",
+          getBgThemeClass(),
+          "text-white"
+        )}>
+          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20 pointer-events-none" />
           
           {currentTrack ? (
             <div className="relative h-full flex flex-col p-4 md:p-8">
@@ -437,7 +467,13 @@ export default function LyricSyncApp() {
                     currentTrack.parsedLrc.map((line, i) => (
                       <div 
                         key={i} 
-                        className={`${getFontSizeClass()} font-bold transition-all duration-300 transform break-words whitespace-pre-wrap ${i === activeLyricIndex ? 'text-secondary scale-105 origin-left opacity-100 drop-shadow-[0_0_15px_rgba(var(--secondary),0.4)]' : 'text-white/10 opacity-100'}`}
+                        className={cn(
+                          getFontSizeClass(),
+                          "font-bold transition-all duration-300 transform break-words whitespace-pre-wrap",
+                          i === activeLyricIndex 
+                            ? `${getActiveColorClass()} scale-105 origin-left opacity-100 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]` 
+                            : 'text-white/10 opacity-100'
+                        )}
                       >
                         {line.text}
                       </div>
@@ -457,8 +493,8 @@ export default function LyricSyncApp() {
                     </div>
                   )}
                 </div>
-                <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-slate-900 to-transparent pointer-events-none" />
-                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
+                <div className={cn("absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-inherit to-transparent pointer-events-none", getBgThemeClass())} />
+                <div className={cn("absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-inherit to-transparent pointer-events-none", getBgThemeClass())} />
               </div>
             </div>
           ) : (
@@ -471,7 +507,6 @@ export default function LyricSyncApp() {
           )}
         </Card>
 
-        {/* Controls Sidebar Panel */}
         <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md">
           <div className="p-4 border-b bg-muted/30">
             <h2 className="font-semibold flex items-center gap-2">
@@ -490,7 +525,6 @@ export default function LyricSyncApp() {
 
                   <Separator />
 
-                  {/* Playback Progress */}
                   <div className="space-y-3">
                     <Slider 
                       value={[currentTime]} 
@@ -505,7 +539,6 @@ export default function LyricSyncApp() {
                     </div>
                   </div>
 
-                  {/* Playback Controls */}
                   <div className="flex items-center justify-center gap-6">
                     <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => skipTrack('prev')}>
                       <SkipBack className="w-6 h-6" />
@@ -524,7 +557,6 @@ export default function LyricSyncApp() {
 
                   <Separator />
 
-                  {/* Volume & Sync Controls */}
                   <div className="space-y-6">
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-[10px] text-muted-foreground font-bold uppercase">
@@ -548,23 +580,62 @@ export default function LyricSyncApp() {
                       <Slider value={[syncOffset]} min={-2} max={2} step={0.1} onValueChange={(v) => setSyncOffset(v[0])} />
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-[10px] text-muted-foreground font-bold uppercase">
-                        <div className="flex items-center gap-2">
-                          <Type className="w-3 h-3" /> Lyric Size
-                        </div>
+                    <div className="space-y-4">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold">Visual Settings</p>
+                      
+                      <div className="space-y-2">
+                        <Label className="text-[10px] flex items-center gap-2 uppercase opacity-70">
+                          <Type className="w-3 h-3" /> Size
+                        </Label>
+                        <Select value={fontSize} onValueChange={setFontSize}>
+                          <SelectTrigger className="w-full h-8 text-xs">
+                            <SelectValue placeholder="Font Size" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="sm">Small</SelectItem>
+                            <SelectItem value="md">Medium</SelectItem>
+                            <SelectItem value="lg">Large</SelectItem>
+                            <SelectItem value="xl">Extra Large</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                      <Select value={fontSize} onValueChange={setFontSize}>
-                        <SelectTrigger className="w-full h-8 text-xs">
-                          <SelectValue placeholder="Font Size" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="sm">Small</SelectItem>
-                          <SelectItem value="md">Medium</SelectItem>
-                          <SelectItem value="lg">Large</SelectItem>
-                          <SelectItem value="xl">Extra Large</SelectItem>
-                        </SelectContent>
-                      </Select>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] flex items-center gap-2 uppercase opacity-70">
+                          <Palette className="w-3 h-3" /> Lyric Color
+                        </Label>
+                        <Select value={activeColor} onValueChange={setActiveColor}>
+                          <SelectTrigger className="w-full h-8 text-xs">
+                            <SelectValue placeholder="Color" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="secondary">Teal (Default)</SelectItem>
+                            <SelectItem value="white">Pure White</SelectItem>
+                            <SelectItem value="yellow">Golden Yellow</SelectItem>
+                            <SelectItem value="green">Lime Green</SelectItem>
+                            <SelectItem value="pink">Hot Pink</SelectItem>
+                            <SelectItem value="cyan">Electric Cyan</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-[10px] flex items-center gap-2 uppercase opacity-70">
+                          <Layout className="w-3 h-3" /> Background
+                        </Label>
+                        <Select value={bgTheme} onValueChange={setBgTheme}>
+                          <SelectTrigger className="w-full h-8 text-xs">
+                            <SelectValue placeholder="Background" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="slate-900">Slate (Default)</SelectItem>
+                            <SelectItem value="black">Pure Black</SelectItem>
+                            <SelectItem value="indigo-950">Midnight Blue</SelectItem>
+                            <SelectItem value="zinc-900">Dark Zinc</SelectItem>
+                            <SelectItem value="rose-950">Deep Burgundy</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
 
