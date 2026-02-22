@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -16,7 +15,8 @@ import {
   ListMusic,
   CheckCircle2,
   Timer,
-  Info
+  Info,
+  Type
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -33,6 +33,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { parseLrc, LrcLine, formatTime } from "@/lib/lrc-parser";
 import { generateLrcFromMp3AndLyrics } from "@/ai/flows/generate-lrc-from-mp3-and-lyrics";
 import { correctLyricSynchronization } from "@/ai/flows/correct-lyric-synchronization";
@@ -62,6 +69,7 @@ export default function LyricSyncApp() {
   const [syncOffset, setSyncOffset] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [fontSize, setFontSize] = useState<string>("lg");
 
   const [newTitle, setNewTitle] = useState("");
   const [newArtist, setNewArtist] = useState("");
@@ -270,6 +278,16 @@ export default function LyricSyncApp() {
     }
   }, [activeLyricIndex]);
 
+  const getFontSizeClass = () => {
+    switch (fontSize) {
+      case 'sm': return 'text-xl md:text-2xl';
+      case 'md': return 'text-2xl md:text-3xl';
+      case 'lg': return 'text-3xl md:text-5xl';
+      case 'xl': return 'text-4xl md:text-7xl';
+      default: return 'text-3xl md:text-5xl';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-8">
       <header className="w-full max-w-7xl flex justify-between items-center mb-8">
@@ -409,25 +427,25 @@ export default function LyricSyncApp() {
           <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-transparent to-teal-900/40 pointer-events-none" />
           
           {currentTrack ? (
-            <div className="relative h-full flex flex-col p-8">
+            <div className="relative h-full flex flex-col p-4 md:p-8">
               <div className="flex-1 overflow-hidden relative">
                 <div 
                   ref={lyricScrollRef}
-                  className="h-full space-y-8 overflow-y-auto no-scrollbar pt-[30%] pb-[30%]"
+                  className="h-full space-y-8 overflow-y-auto no-scrollbar pt-[30%] pb-[30%] px-4"
                 >
                   {currentTrack.parsedLrc && currentTrack.parsedLrc.length > 0 ? (
                     currentTrack.parsedLrc.map((line, i) => (
                       <div 
                         key={i} 
-                        className={`text-3xl md:text-5xl font-bold transition-all duration-300 transform ${i === activeLyricIndex ? 'text-secondary scale-105 origin-left opacity-100 drop-shadow-[0_0_15px_rgba(var(--secondary),0.4)]' : 'text-white/10 opacity-100'}`}
+                        className={`${getFontSizeClass()} font-bold transition-all duration-300 transform break-words whitespace-pre-wrap ${i === activeLyricIndex ? 'text-secondary scale-105 origin-left opacity-100 drop-shadow-[0_0_15px_rgba(var(--secondary),0.4)]' : 'text-white/10 opacity-100'}`}
                       >
                         {line.text}
                       </div>
                     ))
                   ) : currentTrack.lyricsText ? (
-                    <div className="text-center space-y-4 pt-10">
+                    <div className="text-center space-y-4 pt-10 px-4">
                       {currentTrack.lyricsText.split('\n').map((line, i) => (
-                        <div key={i} className="text-xl md:text-2xl font-medium text-white/40">
+                        <div key={i} className="text-xl md:text-2xl font-medium text-white/40 break-words whitespace-pre-wrap">
                           {line}
                         </div>
                       ))}
@@ -529,6 +547,25 @@ export default function LyricSyncApp() {
                       </div>
                       <Slider value={[syncOffset]} min={-2} max={2} step={0.1} onValueChange={(v) => setSyncOffset(v[0])} />
                     </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground font-bold uppercase">
+                        <div className="flex items-center gap-2">
+                          <Type className="w-3 h-3" /> Lyric Size
+                        </div>
+                      </div>
+                      <Select value={fontSize} onValueChange={setFontSize}>
+                        <SelectTrigger className="w-full h-8 text-xs">
+                          <SelectValue placeholder="Font Size" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sm">Small</SelectItem>
+                          <SelectItem value="md">Medium</SelectItem>
+                          <SelectItem value="lg">Large</SelectItem>
+                          <SelectItem value="xl">Extra Large</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <Separator />
@@ -569,4 +606,3 @@ export default function LyricSyncApp() {
     </div>
   );
 }
-
