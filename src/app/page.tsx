@@ -24,7 +24,8 @@ import {
   Sun,
   Repeat,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -85,6 +86,7 @@ export default function LyricSyncApp() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isIframe, setIsIframe] = useState(false);
   
   // Screen Wake Lock state
   const [wakeLock, setWakeLock] = useState<any>(null);
@@ -108,6 +110,11 @@ export default function LyricSyncApp() {
   const lyricScrollRef = useRef<HTMLDivElement | null>(null);
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
+
+  // Detect iframe on mount
+  useEffect(() => {
+    setIsIframe(window.self !== window.top);
+  }, []);
 
   // Optimized Screen Wake Lock handling with explicit User Gesture support
   const requestWakeLock = useCallback(async (isManual = false) => {
@@ -140,9 +147,9 @@ export default function LyricSyncApp() {
       
       // Detailed diagnostics for common errors
       if (err.name === 'NotAllowedError') {
-        const isIframe = window.self !== window.top;
-        if (isIframe) {
-          errorMsg = "權限被拒絕：偵測到您正在預覽視窗中使用。請點擊右上角按鈕「開啟新分頁」測試此功能。";
+        const isInIframe = window.self !== window.top;
+        if (isInIframe) {
+          errorMsg = "權限被拒絕：偵測到您正在預覽視窗中使用。請點擊頂部按鈕「開啟獨立網頁」測試此功能。";
         } else {
           errorMsg = "權限被拒絕：請確保使用手機 Chrome 直接開啟網址，不要透過 LINE/FB 開啟。";
         }
@@ -236,7 +243,6 @@ export default function LyricSyncApp() {
       setCurrentTime(0);
       if (isPlaying) {
         audioRef.current.play().catch(e => console.warn("Auto-play prevented", e));
-        // Ensure wake lock is re-requested on track change
         requestWakeLock();
       }
     }
@@ -257,7 +263,6 @@ export default function LyricSyncApp() {
   const togglePlay = () => {
     if (!audioRef.current || !currentTrack) return;
     if (audioRef.current.paused) {
-      // Crucial: Request Wake Lock and Fullscreen within the CLICK handler
       requestWakeLock();
       toggleFullscreen(true);
       
@@ -496,8 +501,32 @@ export default function LyricSyncApp() {
     }
   };
 
+  const openInNewTab = () => {
+    window.open(window.location.href, '_blank');
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-8">
+      {/* Environment Detection Banner */}
+      {isIframe && (
+        <div className="w-full max-w-7xl mb-4 p-4 bg-primary/10 border border-primary/20 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-3 text-primary">
+            <Info className="w-5 h-5 shrink-0" />
+            <p className="text-sm font-medium leading-tight">
+              偵測到預覽環境。為了支援<strong>「螢幕常亮」</strong>與<strong>「全螢幕」</strong>，請點擊右側按鈕開啟獨立分頁。
+            </p>
+          </div>
+          <Button 
+            size="sm" 
+            onClick={openInNewTab}
+            className="shrink-0 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
+          >
+            <ExternalLink className="w-4 h-4" />
+            開啟獨立網頁測試
+          </Button>
+        </div>
+      )}
+
       <header className="w-full max-w-7xl flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <div className="bg-primary p-2 rounded-xl text-primary-foreground shadow-lg shadow-primary/20">
@@ -650,7 +679,6 @@ export default function LyricSyncApp() {
                   onClick={() => {
                     setCurrentTrackIndex(index);
                     setIsPlaying(true);
-                    // Crucial: Request Wake Lock and Fullscreen within the CLICK handler
                     requestWakeLock();
                     toggleFullscreen(true);
                   }}
