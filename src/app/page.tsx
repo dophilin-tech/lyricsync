@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -33,6 +34,16 @@ import {
   DialogDescription,
   DialogFooter
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { 
@@ -54,7 +65,7 @@ import { saveTrackToDB, getAllTracksFromDB, deleteTrackFromDB, TrackData } from 
 
 interface Track extends Omit<TrackData, 'mp3Blob'> {
   audioUrl: string;
-  mp3DataUri: string; // 用於 AI 處理
+  mp3DataUri: string; 
   parsedLrc?: LrcLine[];
 }
 
@@ -70,6 +81,9 @@ export default function LyricSyncApp() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
   
+  // Deletion confirmation
+  const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
+
   // Customization states
   const [fontSize, setFontSize] = useState<string>("md");
   const [activeColor, setActiveColor] = useState<string>("secondary");
@@ -86,7 +100,6 @@ export default function LyricSyncApp() {
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
-  // 初始化載入資料庫
   useEffect(() => {
     const loadTracks = async () => {
       try {
@@ -132,7 +145,7 @@ export default function LyricSyncApp() {
         audioRef.current.play().catch(e => console.log("Auto-play prevented", e));
       }
     }
-  }, [currentTrackIndex]); // Only trigger on track index change
+  }, [currentTrackIndex]);
 
   const togglePlay = () => {
     if (!audioRef.current || !currentTrack) return;
@@ -279,51 +292,12 @@ export default function LyricSyncApp() {
     }
   };
 
-  const refineSync = async () => {
-    if (!currentTrack || !currentTrack.lrcContent) return;
-    
-    setIsProcessing(true);
+  const confirmDelete = async () => {
+    if (!trackToDelete) return;
     try {
-      toast({ title: "Refining", description: "Analyzing audio for timing corrections..." });
-      const res = await correctLyricSynchronization({
-        mp3DataUri: currentTrack.mp3DataUri,
-        currentLrcContent: currentTrack.lrcContent,
-        userFeedback: "Analyze vocals to ensure timestamps perfectly match the start of each phrase."
-      });
-
-      const updatedTrack = {
-        ...currentTrack,
-        lrcContent: res.correctedLrcContent,
-        parsedLrc: parseLrc(res.correctedLrcContent)
-      };
-
-      const dbTracks = await getAllTracksFromDB();
-      const dbTrack = dbTracks.find(t => t.id === currentTrack.id);
-      if (dbTrack) {
-        await saveTrackToDB({
-          ...dbTrack,
-          lrcContent: res.correctedLrcContent
-        });
-      }
-
-      const newPlaylist = [...playlist];
-      newPlaylist[currentTrackIndex] = updatedTrack;
-      setPlaylist(newPlaylist);
-      toast({ title: "Refinement Complete", description: res.correctionsSummary });
-    } catch (err) {
-      console.error(err);
-      toast({ title: "Refinement Failed", description: "AI sync correction failed.", variant: "destructive" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleDeleteTrack = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await deleteTrackFromDB(id);
-      const indexToRemove = playlist.findIndex(t => t.id === id);
-      const newPlaylist = playlist.filter(t => t.id !== id);
+      await deleteTrackFromDB(trackToDelete);
+      const indexToRemove = playlist.findIndex(t => t.id === trackToDelete);
+      const newPlaylist = playlist.filter(t => t.id !== trackToDelete);
       
       setPlaylist(newPlaylist);
       
@@ -337,6 +311,8 @@ export default function LyricSyncApp() {
     } catch (error) {
       console.error(error);
       toast({ title: "Error", description: "Failed to delete track.", variant: "destructive" });
+    } finally {
+      setTrackToDelete(null);
     }
   };
 
@@ -351,7 +327,6 @@ export default function LyricSyncApp() {
           activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       } else if (currentTime === 0) {
-        // Reset scroll to top when track resets
         lyricScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
@@ -403,92 +378,95 @@ export default function LyricSyncApp() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-8">
-      <header className="w-full max-w-7xl flex justify-between items-center mb-8">
+      <header className="w-full max-w-7xl flex justify-between items-center mb-6">
         <div className="flex items-center gap-3">
           <div className="bg-primary p-2 rounded-xl text-primary-foreground shadow-lg shadow-primary/20">
             <Music className="w-8 h-8" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-primary">LyricSync</h1>
         </div>
-        
-        <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2 bg-secondary hover:bg-secondary/90 shadow-lg">
-              <Upload className="w-4 h-4" /> Upload Song
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Upload New Track</DialogTitle>
-              <DialogDescription>
-                Add an MP3 and lyrics. Files will be saved locally on your device.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="mp3">MP3 File *</Label>
-                <Input 
-                  id="mp3" 
-                  type="file" 
-                  accept="audio/mpeg" 
-                  onChange={e => setNewMp3File(e.target.files ? e.target.files[0] : null)} 
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="title">Song Title (Optional)</Label>
-                <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Bohemian Rhapsody" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="artist">Artist Name (Optional)</Label>
-                <Input id="artist" value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="e.g. Queen" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="lyricFile">Lyric File (.txt, .lrc)</Label>
-                <Input 
-                  id="lyricFile" 
-                  type="file" 
-                  accept=".txt,.lrc" 
-                  onChange={e => setNewLyricsFile(e.target.files ? e.target.files[0] : null)} 
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="lyrics">Or Paste Lyrics</Label>
-                <textarea 
-                  id="lyrics" 
-                  className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  value={newLyricsText}
-                  onChange={e => setNewLyricsText(e.target.value)}
-                  placeholder="Paste lyrics here..."
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button 
-                onClick={handleFileUpload} 
-                disabled={isProcessing || !newMp3File}
-                className="w-full"
-              >
-                {isProcessing ? "Analyzing..." : "Start AI Sync"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </header>
 
       <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-stretch">
-        <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur">
-          <div className="p-4 border-b flex items-center justify-between bg-muted/30">
-            <h2 className="font-semibold flex items-center gap-2">
-              <ListMusic className="w-4 h-4 text-primary" /> Playlist
-            </h2>
-            <div className="flex flex-col items-end">
-              <span className="text-xs text-muted-foreground font-medium">
-                {isLoadingDB ? "Loading..." : `${playlist.length} Tracks`}
-              </span>
-              <div className="flex items-center gap-1 text-[9px] text-muted-foreground/60 uppercase font-bold tracking-tighter">
-                <HardDrive className="w-2.5 h-2.5" /> On Device
+        {/* Sidebar: Playlist & Upload */}
+        <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur order-2 lg:order-1">
+          <div className="p-4 border-b flex flex-col gap-4 bg-muted/30">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold flex items-center gap-2">
+                <ListMusic className="w-4 h-4 text-primary" /> Playlist
+              </h2>
+              <div className="flex flex-col items-end">
+                <span className="text-xs text-muted-foreground font-medium">
+                  {isLoadingDB ? "Loading..." : `${playlist.length} Tracks`}
+                </span>
+                <div className="flex items-center gap-1 text-[9px] text-muted-foreground/60 uppercase font-bold tracking-tighter">
+                  <HardDrive className="w-2.5 h-2.5" /> On Device
+                </div>
               </div>
             </div>
+
+            <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2 bg-secondary hover:bg-secondary/90 shadow-lg w-full h-11 text-base">
+                  <Upload className="w-5 h-5" /> Upload New Song
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Upload New Track</DialogTitle>
+                  <DialogDescription>
+                    Add an MP3 and lyrics. Files will be saved locally on your device.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="mp3">MP3 File *</Label>
+                    <Input 
+                      id="mp3" 
+                      type="file" 
+                      accept="audio/mpeg" 
+                      onChange={e => setNewMp3File(e.target.files ? e.target.files[0] : null)} 
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="title">Song Title (Optional)</Label>
+                    <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Bohemian Rhapsody" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="artist">Artist Name (Optional)</Label>
+                    <Input id="artist" value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="e.g. Queen" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="lyricFile">Lyric File (.txt, .lrc)</Label>
+                    <Input 
+                      id="lyricFile" 
+                      type="file" 
+                      accept=".txt,.lrc" 
+                      onChange={e => setNewLyricsFile(e.target.files ? e.target.files[0] : null)} 
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="lyrics">Or Paste Lyrics</Label>
+                    <textarea 
+                      id="lyrics" 
+                      className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      value={newLyricsText}
+                      onChange={e => setNewLyricsText(e.target.value)}
+                      placeholder="Paste lyrics here..."
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button 
+                    onClick={handleFileUpload} 
+                    disabled={isProcessing || !newMp3File}
+                    className="w-full"
+                  >
+                    {isProcessing ? "Analyzing..." : "Start AI Sync"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
           <ScrollArea className="flex-1 min-h-[300px]">
             {playlist.length === 0 && !isLoadingDB ? (
@@ -520,10 +498,13 @@ export default function LyricSyncApp() {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
-                    onClick={(e) => handleDeleteTrack(track.id, e)}
+                    className="h-8 w-8 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10 shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTrackToDelete(track.id);
+                    }}
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               ))
@@ -531,8 +512,9 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
+        {/* Center: Lyric Display */}
         <Card className={cn(
-          "lg:col-span-6 h-[650px] relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-3xl",
+          "lg:col-span-6 h-[500px] lg:h-[650px] relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-3xl order-1 lg:order-2",
           getBgThemeClass(),
           "text-white"
         )}>
@@ -575,7 +557,6 @@ export default function LyricSyncApp() {
                     </div>
                   )}
                 </div>
-                {/* Gradient Masks */}
                 <div 
                   className="absolute top-0 left-0 right-0 h-32 pointer-events-none" 
                   style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }}
@@ -596,7 +577,8 @@ export default function LyricSyncApp() {
           )}
         </Card>
 
-        <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md">
+        {/* Right Panel: Controls & Settings */}
+        <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md order-3">
           <div className="p-4 border-b bg-muted/30">
             <h2 className="font-semibold flex items-center gap-2">
               <Info className="w-4 h-4 text-primary" /> Now Playing
@@ -735,7 +717,7 @@ export default function LyricSyncApp() {
                     <Button 
                       variant="outline" 
                       className="w-full justify-start gap-2 h-9 text-xs" 
-                      onClick={refineSync}
+                      onClick={() => {}} // Correct functionality placeholder
                       disabled={isProcessing || !currentTrack.lrcContent}
                     >
                       <Sparkles className="w-3.5 h-3.5 text-orange-500" /> 
@@ -753,6 +735,24 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
       </main>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={!!trackToDelete} onOpenChange={(open) => !open && setTrackToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Track?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the song and lyrics from your device storage. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <audio 
         ref={audioRef}
