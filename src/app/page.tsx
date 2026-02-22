@@ -17,7 +17,8 @@ import {
   Info,
   Type,
   Palette,
-  Layout
+  Layout,
+  HardDrive
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -92,8 +93,6 @@ export default function LyricSyncApp() {
         const savedTracks = await getAllTracksFromDB();
         const tracksWithUrls = await Promise.all(savedTracks.map(async (st) => {
           const audioUrl = URL.createObjectURL(st.mp3Blob);
-          // 為了讓 AI 修正功能還能運作，我們需要時重新轉換 DataURI (如果需要的話)
-          // 這裡暫時只載入 Blob URL 供播放
           const mp3DataUri = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
@@ -250,7 +249,6 @@ export default function LyricSyncApp() {
         createdAt: Date.now()
       };
 
-      // 儲存至 IndexedDB
       await saveTrackToDB(trackData);
 
       const newTrack: Track = {
@@ -298,8 +296,6 @@ export default function LyricSyncApp() {
         parsedLrc: parseLrc(res.correctedLrcContent)
       };
 
-      // 更新資料庫中的紀錄 (需要 Blob，所以我們從現有 playlist 找或重新抓)
-      // 這裡簡化：我們需要將更新後的 Track 重新存回 DB
       const dbTracks = await getAllTracksFromDB();
       const dbTrack = dbTracks.find(t => t.id === currentTrack.id);
       if (dbTrack) {
@@ -468,9 +464,14 @@ export default function LyricSyncApp() {
             <h2 className="font-semibold flex items-center gap-2">
               <ListMusic className="w-4 h-4 text-primary" /> Playlist
             </h2>
-            <span className="text-xs text-muted-foreground font-medium">
-              {isLoadingDB ? "Loading..." : `${playlist.length} Tracks`}
-            </span>
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-muted-foreground font-medium">
+                {isLoadingDB ? "Loading..." : `${playlist.length} Tracks`}
+              </span>
+              <div className="flex items-center gap-1 text-[9px] text-muted-foreground/60 uppercase font-bold tracking-tighter">
+                <HardDrive className="w-2.5 h-2.5" /> On Device
+              </div>
+            </div>
           </div>
           <ScrollArea className="flex-1 min-h-[300px]">
             {playlist.length === 0 && !isLoadingDB ? (
@@ -741,4 +742,3 @@ export default function LyricSyncApp() {
     </div>
   );
 }
-
