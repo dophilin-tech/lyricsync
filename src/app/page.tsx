@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -35,6 +34,7 @@ import {
   DialogTitle, 
   DialogTrigger,
   DialogDescription,
+  DialogDescription as DialogDesc,
   DialogFooter
 } from "@/components/ui/dialog";
 import {
@@ -110,8 +110,10 @@ export default function LyricSyncApp() {
   // Handle Screen Wake Lock
   useEffect(() => {
     const requestWakeLock = async () => {
+      // Feature detection and check if we are in a secure context (required by most browsers)
       if ('wakeLock' in navigator && isPlaying) {
         try {
+          // Check for permission policy if it exists (some browsers might block it in iframes)
           const lock = await (navigator as any).wakeLock.request('screen');
           setWakeLock(lock);
           console.log("Wake Lock is active");
@@ -121,7 +123,9 @@ export default function LyricSyncApp() {
             setWakeLock(null);
           });
         } catch (err: any) {
-          console.error(`${err.name}, ${err.message}`);
+          // Using console.warn instead of console.error to avoid triggering the development error overlay.
+          // Wake lock is a progressive enhancement and shouldn't crash the app if it's unavailable or blocked.
+          console.warn(`Wake Lock restricted or unavailable: ${err.name}, ${err.message}`);
         }
       }
     };
@@ -130,7 +134,7 @@ export default function LyricSyncApp() {
       requestWakeLock();
     } else {
       if (wakeLock) {
-        wakeLock.release();
+        wakeLock.release().catch(() => {});
         setWakeLock(null);
       }
     }
@@ -145,7 +149,7 @@ export default function LyricSyncApp() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (wakeLock) wakeLock.release();
+      if (wakeLock) wakeLock.release().catch(() => {});
     };
   }, [isPlaying]);
 
@@ -179,7 +183,7 @@ export default function LyricSyncApp() {
         }));
         setPlaylist(tracksWithUrls);
       } catch (error) {
-        console.error("Failed to load tracks from DB", error);
+        console.warn("Failed to load tracks from DB", error);
       } finally {
         setIsLoadingDB(false);
       }
@@ -200,7 +204,7 @@ export default function LyricSyncApp() {
       setSyncOffset(0);
       setCurrentTime(0);
       if (isPlaying) {
-        audioRef.current.play().catch(e => console.log("Auto-play prevented", e));
+        audioRef.current.play().catch(e => console.warn("Auto-play prevented", e));
       }
     }
   }, [currentTrackIndex]);
@@ -209,7 +213,7 @@ export default function LyricSyncApp() {
     if (!audioRef.current || !currentTrack) return;
     if (audioRef.current.paused) {
       audioRef.current.play().catch(error => {
-        console.error("Playback failed:", error);
+        console.warn("Playback failed:", error);
         toast({ title: "Playback Error", description: "Browser blocked audio playback.", variant: "destructive" });
       });
     } else {
@@ -319,7 +323,7 @@ export default function LyricSyncApp() {
           parsedLrc = parseLrc(lrcContent);
           toast({ title: "Success", description: "AI generated synchronized lyrics!" });
         } catch (err) {
-          console.error(err);
+          console.warn(err);
           toast({ title: "AI Error", description: "AI sync failed. Using plain text.", variant: "destructive" });
         }
       }
@@ -357,7 +361,7 @@ export default function LyricSyncApp() {
       setNewLyricsText("");
       setIsUploadOpen(false);
     } catch (error) {
-      console.error(error);
+      console.warn(error);
       toast({ title: "Upload Failed", description: "An error occurred during file processing.", variant: "destructive" });
     } finally {
       setIsProcessing(false);
@@ -381,7 +385,7 @@ export default function LyricSyncApp() {
       }
       toast({ title: "Deleted", description: "Track removed from device storage." });
     } catch (error) {
-      console.error(error);
+      console.warn(error);
       toast({ title: "Error", description: "Failed to delete track.", variant: "destructive" });
     } finally {
       setTrackToDelete(null);
@@ -524,9 +528,9 @@ export default function LyricSyncApp() {
                 <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Upload New Track</DialogTitle>
-                    <DialogDescription>
+                    <DialogDesc>
                       Add an MP3 and lyrics. Files will be saved locally on your device.
-                    </DialogDescription>
+                    </DialogDesc>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
@@ -885,4 +889,3 @@ export default function LyricSyncApp() {
     </div>
   );
 }
-
