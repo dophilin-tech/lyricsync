@@ -110,14 +110,20 @@ export default function LyricSyncApp() {
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
-  // Optimized Screen Wake Lock handling
-  const requestWakeLock = useCallback(async () => {
+  // Optimized Screen Wake Lock handling with explicit User Gesture support
+  const requestWakeLock = useCallback(async (isManual = false) => {
     if (!('wakeLock' in navigator)) {
       setWakeLockError("瀏覽器不支援 Wake Lock API");
       return;
     }
 
     try {
+      // If we already have a lock, release it first to be clean
+      if (wakeLock) {
+        await wakeLock.release();
+        setWakeLock(null);
+      }
+
       const lock = await (navigator as any).wakeLock.request('screen');
       setWakeLock(lock);
       setWakeLockError(null);
@@ -125,16 +131,35 @@ export default function LyricSyncApp() {
       lock.addEventListener('release', () => {
         setWakeLock(null);
       });
+
+      if (isManual) {
+        toast({ title: "螢幕常亮已啟動", description: "已成功獲取系統鎖定。" });
+      }
     } catch (err: any) {
       setWakeLock(null);
       let errorMsg = err.message;
+      
+      // Detailed diagnostics for common errors
       if (err.name === 'NotAllowedError') {
-        errorMsg = "權限被拒絕。請確保在 HTTPS 環境下直接開啟網址，不要透過 iframe 或其他 App 開啟。";
+        const isIframe = window.self !== window.top;
+        if (isIframe) {
+          errorMsg = "權限被拒絕：偵測到您正在預覽視窗中使用。請點擊右上角按鈕「開啟新分頁」測試此功能。";
+        } else {
+          errorMsg = "權限被拒絕：請確保使用手機 Chrome 直接開啟網址，不要透過 LINE/FB 開啟。";
+        }
       }
+      
       setWakeLockError(errorMsg);
+      if (isManual) {
+        toast({ 
+          title: "螢幕常亮失敗", 
+          description: errorMsg, 
+          variant: "destructive" 
+        });
+      }
       console.warn("Wake Lock 獲取失敗:", err);
     }
-  }, []);
+  }, [wakeLock]);
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
@@ -212,6 +237,8 @@ export default function LyricSyncApp() {
       setCurrentTime(0);
       if (isPlaying) {
         audioRef.current.play().catch(e => console.warn("Auto-play prevented", e));
+        // Ensure wake lock is re-requested on track change
+        requestWakeLock();
       }
     }
   }, [currentTrackIndex]);
@@ -231,7 +258,10 @@ export default function LyricSyncApp() {
   const togglePlay = () => {
     if (!audioRef.current || !currentTrack) return;
     if (audioRef.current.paused) {
+      // Crucial: Request Wake Lock and Fullscreen within the CLICK handler
+      requestWakeLock();
       toggleFullscreen(true);
+      
       audioRef.current.play().catch(error => {
         console.warn("Playback failed:", error);
         toast({ title: "播放錯誤", description: "瀏覽器封鎖了自動播放，請手動點擊。", variant: "destructive" });
@@ -487,12 +517,11 @@ export default function LyricSyncApp() {
               variant="outline" 
               className="flex gap-1.5 items-center text-destructive bg-destructive/10 border-destructive cursor-pointer hover:bg-destructive/20"
               onClick={() => {
-                requestWakeLock();
-                toast({ title: "嘗試重新獲取", description: "正在嘗試獲取螢幕喚醒鎖定..." });
+                requestWakeLock(true);
               }}
             >
               <AlertCircle className="w-3 h-3" /> {wakeLockError ? "喚醒受限 (點擊重試)" : "喚醒關閉"}
-              <RefreshCw className="w-2.5 h-2.5 ml-1 animate-spin-slow" />
+              <RefreshCw className="w-2.5 h-2.5 ml-1" />
             </Badge>
           ) : null}
           <Button 
@@ -622,6 +651,9 @@ export default function LyricSyncApp() {
                   onClick={() => {
                     setCurrentTrackIndex(index);
                     setIsPlaying(true);
+                    // Crucial: Request Wake Lock and Fullscreen within the CLICK handler
+                    requestWakeLock();
+                    toggleFullscreen(true);
                   }}
                   className={`group p-4 flex items-center gap-4 cursor-pointer border-b last:border-0 transition-colors ${index === currentTrackIndex ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-muted/50'}`}
                 >
