@@ -2,7 +2,7 @@
 /**
  * @fileOverview This file implements a Genkit flow for generating synchronized LRC
  * (Lyrics Karaoke) files from an MP3 audio and its corresponding lyrics text.
- * It simulates AI-powered lyric extraction and timestamping to produce an LRC file.
+ * It leverages Gemini's multimodal capabilities to analyze audio for accurate timestamping.
  *
  * - generateLrcFromMp3AndLyrics - A function that orchestrates the LRC generation process.
  * - GenerateLrcInput - The input type for the generateLrcFromMp3AndLyrics function.
@@ -39,28 +39,30 @@ const generateLrcPrompt = ai.definePrompt({
   name: 'generateLrcPrompt',
   input: {schema: GenerateLrcInputSchema},
   output: {schema: GenerateLrcOutputSchema},
-  prompt: `You are an AI assistant specialized in creating accurate LRC (Lyrics Karaoke) files. Your task is to generate an LRC file by assigning realistic and sequential timestamps to each line of the provided lyrics. You have simulated an analysis of the provided MP3 audio and will produce timestamps that are plausible for a typical song length (e.g., 3-5 minutes).
+  prompt: `You are an AI assistant specialized in creating accurate LRC (Lyrics Karaoke) files. 
 
-Use the following information:
+Your task is to listen to the provided MP3 audio and generate an LRC file by assigning precise timestamps to each line of the lyrics text.
+
+Audio: {{media url=mp3DataUri}}
 
 Song Title: {{{songTitle}}}
 Artist: {{{artist}}}
 
-Lyrics:
+Lyrics Text:
 {{{lyricsText}}}
 
 Instructions:
-1. Start with metadata tags: [ar:{{{artist}}}] and [ti:{{{songTitle}}}]. Only include them if the values are provided.
-2. Assign unique, sequential, and plausible timestamps to each line of the lyrics. Timestamps should be in the format [mm:ss.xx], where 'mm' is minutes, 'ss' is seconds, and 'xx' is hundredths of a second.
-3. Ensure the timestamps increase monotonically.
-4. Output only the LRC content, no other conversational text.
+1. Listen carefully to the audio to determine exactly when each lyric line starts.
+2. Start with metadata tags: [ar:{{{artist}}}] and [ti:{{{songTitle}}}].
+3. Assign accurate [mm:ss.xx] timestamps to every line.
+4. Ensure timestamps are perfectly synchronized with the vocals in the audio.
+5. Output only the LRC content.
 
 Example LRC format:
 [ar:Artist Name]
 [ti:Song Title]
 [00:05.12]This is the first line.
 [00:08.45]This is the second line.
-[00:12.78]And so on.
 `,
 });
 
@@ -71,12 +73,6 @@ const generateLrcFromMp3AndLyricsFlow = ai.defineFlow(
     outputSchema: GenerateLrcOutputSchema,
   },
   async input => {
-    // Although mp3DataUri is provided in the input, the current LLM (Gemini-Pro)
-    // is text-based and cannot directly process audio to extract timestamps.
-    // The prompt guides the LLM to *simulate* this analysis and generate plausible
-    // timestamps based on the provided lyrics and general song structure.
-    // A real-world implementation would involve an external audio analysis service
-    // (e.g., speech-to-text with word-level timestamps) integrated via a Genkit tool.
     const {output} = await generateLrcPrompt(input);
     return output!;
   }
