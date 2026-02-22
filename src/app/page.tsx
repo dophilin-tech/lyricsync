@@ -127,11 +127,12 @@ export default function LyricSyncApp() {
       audioRef.current.src = currentTrack.audioUrl;
       audioRef.current.load();
       setSyncOffset(0);
+      setCurrentTime(0);
       if (isPlaying) {
         audioRef.current.play().catch(e => console.log("Auto-play prevented", e));
       }
     }
-  }, [currentTrack]);
+  }, [currentTrackIndex]); // Only trigger on track index change
 
   const togglePlay = () => {
     if (!audioRef.current || !currentTrack) return;
@@ -343,13 +344,18 @@ export default function LyricSyncApp() {
   const activeLyricIndex = currentTrack?.parsedLrc?.findLastIndex(l => l.time <= adjustedCurrentTime) ?? -1;
 
   useEffect(() => {
-    if (lyricScrollRef.current && activeLyricIndex !== -1) {
-      const activeEl = lyricScrollRef.current.children[activeLyricIndex] as HTMLElement;
-      if (activeEl) {
-        activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (lyricScrollRef.current) {
+      if (activeLyricIndex !== -1) {
+        const activeEl = lyricScrollRef.current.children[activeLyricIndex] as HTMLElement;
+        if (activeEl) {
+          activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      } else if (currentTime === 0) {
+        // Reset scroll to top when track resets
+        lyricScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }
-  }, [activeLyricIndex]);
+  }, [activeLyricIndex, currentTime]);
 
   const getFontSizeClass = () => {
     switch (fontSize) {
@@ -381,6 +387,17 @@ export default function LyricSyncApp() {
       case 'zinc-900': return 'bg-zinc-900';
       case 'rose-950': return 'bg-rose-950';
       default: return 'bg-slate-900';
+    }
+  };
+
+  const getThemeHex = () => {
+    switch (bgTheme) {
+      case 'slate-900': return '#0f172a';
+      case 'black': return '#000000';
+      case 'indigo-950': return '#1e1b4b';
+      case 'zinc-900': return '#18181b';
+      case 'rose-950': return '#450a0a';
+      default: return '#0f172a';
     }
   };
 
@@ -522,11 +539,11 @@ export default function LyricSyncApp() {
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20 pointer-events-none" />
           
           {currentTrack ? (
-            <div className="relative h-full flex flex-col p-4 md:p-8">
+            <div className="relative h-full flex flex-col">
               <div className="flex-1 overflow-hidden relative">
                 <div 
                   ref={lyricScrollRef}
-                  className="h-full space-y-8 overflow-y-auto no-scrollbar pt-[30%] pb-[30%] px-4"
+                  className="h-full space-y-8 overflow-y-auto no-scrollbar pt-[45%] pb-[45%] px-6 md:px-12"
                 >
                   {currentTrack.parsedLrc && currentTrack.parsedLrc.length > 0 ? (
                     currentTrack.parsedLrc.map((line, i) => (
@@ -534,17 +551,17 @@ export default function LyricSyncApp() {
                         key={i} 
                         className={cn(
                           getFontSizeClass(),
-                          "font-bold transition-all duration-300 transform break-words whitespace-pre-wrap",
+                          "font-bold transition-all duration-300 transform break-words whitespace-pre-wrap leading-tight",
                           i === activeLyricIndex 
                             ? `${getActiveColorClass()} scale-105 origin-left opacity-100 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]` 
-                            : 'text-white/10 opacity-100'
+                            : 'text-white/20 opacity-100'
                         )}
                       >
                         {line.text}
                       </div>
                     ))
                   ) : currentTrack.lyricsText ? (
-                    <div className="text-center space-y-4 pt-10 px-4">
+                    <div className="text-center space-y-6 pt-10 px-4">
                       {currentTrack.lyricsText.split('\n').map((line, i) => (
                         <div key={i} className="text-xl md:text-2xl font-medium text-white/40 break-words whitespace-pre-wrap">
                           {line}
@@ -558,8 +575,15 @@ export default function LyricSyncApp() {
                     </div>
                   )}
                 </div>
-                <div className={cn("absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-inherit to-transparent pointer-events-none", getBgThemeClass())} />
-                <div className={cn("absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-inherit to-transparent pointer-events-none", getBgThemeClass())} />
+                {/* Gradient Masks */}
+                <div 
+                  className="absolute top-0 left-0 right-0 h-32 pointer-events-none" 
+                  style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }}
+                />
+                <div 
+                  className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none" 
+                  style={{ background: `linear-gradient(to top, ${getThemeHex()}, transparent)` }}
+                />
               </div>
             </div>
           ) : (
