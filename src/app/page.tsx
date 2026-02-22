@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -106,7 +107,7 @@ export default function LyricSyncApp() {
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
-  // Handle Screen Wake Lock with improved reliability
+  // Handle Screen Wake Lock with improved reliability and visual error reporting
   useEffect(() => {
     let lock: any = null;
 
@@ -123,7 +124,13 @@ export default function LyricSyncApp() {
             }
           });
         } catch (err: any) {
-          console.warn(`Wake Lock restricted: ${err.name}, ${err.message}`);
+          setWakeLock(null);
+          // Show the error to the user via Toast
+          toast({
+            variant: "destructive",
+            title: "螢幕常亮功能受限",
+            description: `${err.name}: ${err.message}. 請確保在安全的 HTTPS 環境下使用。`,
+          });
         }
       }
     };
@@ -224,7 +231,7 @@ export default function LyricSyncApp() {
       toggleFullscreen(true);
       audioRef.current.play().catch(error => {
         console.warn("Playback failed:", error);
-        toast({ title: "Playback Error", description: "Browser blocked audio playback.", variant: "destructive" });
+        toast({ title: "播放錯誤", description: "瀏覽器封鎖了自動播放，請手動點擊。", variant: "destructive" });
       });
     } else {
       audioRef.current.pause();
@@ -287,7 +294,7 @@ export default function LyricSyncApp() {
 
   const handleFileUpload = async () => {
     if (!newMp3File) {
-      toast({ title: "Error", description: "MP3 file is required.", variant: "destructive" });
+      toast({ title: "錯誤", description: "請選擇 MP3 檔案。", variant: "destructive" });
       return;
     }
 
@@ -297,7 +304,7 @@ export default function LyricSyncApp() {
       const mp3DataUri = await readFileAsDataURL(newMp3File);
       
       const finalTitle = newTitle || newMp3File.name.replace(/\.[^/.]+$/, "");
-      const finalArtist = newArtist || "Unknown Artist";
+      const finalArtist = newArtist || "未知歌手";
 
       let lyricsToProcess = newLyricsText;
       let lrcContent = "";
@@ -317,7 +324,7 @@ export default function LyricSyncApp() {
 
       if (lyricsToProcess && !isLrcFile) {
         try {
-          toast({ title: "Syncing", description: "AI is analyzing audio for perfect timing..." });
+          toast({ title: "同步中", description: "AI 正在分析音訊以對齊歌詞時間..." });
           const aiRes = await generateLrcFromMp3AndLyrics({
             mp3DataUri,
             lyricsText: lyricsToProcess,
@@ -326,10 +333,10 @@ export default function LyricSyncApp() {
           });
           lrcContent = aiRes.lrcContent;
           parsedLrc = parseLrc(lrcContent);
-          toast({ title: "Success", description: "AI generated synchronized lyrics!" });
+          toast({ title: "成功", description: "AI 已完成歌詞同步！" });
         } catch (err) {
           console.warn(err);
-          toast({ title: "AI Error", description: "AI sync failed. Using plain text.", variant: "destructive" });
+          toast({ title: "AI 錯誤", description: "同步失敗，將使用純文字歌詞。", variant: "destructive" });
         }
       }
 
@@ -367,7 +374,7 @@ export default function LyricSyncApp() {
       setIsUploadOpen(false);
     } catch (error) {
       console.warn(error);
-      toast({ title: "Upload Failed", description: "An error occurred during file processing.", variant: "destructive" });
+      toast({ title: "上傳失敗", description: "處理檔案時發生錯誤。", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -388,10 +395,10 @@ export default function LyricSyncApp() {
       } else if (currentTrackIndex > indexToRemove) {
         setCurrentTrackIndex(currentTrackIndex - 1);
       }
-      toast({ title: "Deleted", description: "Track removed from device storage." });
+      toast({ title: "已刪除", description: "歌曲已從裝置儲存中移除。" });
     } catch (error) {
       console.warn(error);
-      toast({ title: "Error", description: "Failed to delete track.", variant: "destructive" });
+      toast({ title: "錯誤", description: "無法刪除歌曲。", variant: "destructive" });
     } finally {
       setTrackToDelete(null);
     }
@@ -469,7 +476,7 @@ export default function LyricSyncApp() {
         
         <div className="flex items-center gap-2">
           {wakeLock && (
-            <Badge variant="outline" className="hidden sm:flex gap-1.5 items-center text-green-600 bg-green-50 border-green-200">
+            <Badge variant="outline" className="flex gap-1.5 items-center text-green-600 bg-green-50 border-green-200">
               <Sun className="w-3 h-3" /> 螢幕常亮已開啟
             </Badge>
           )}
@@ -842,7 +849,7 @@ export default function LyricSyncApp() {
                           <SelectContent>
                             <SelectItem value="slate-900">深灰 (預設)</SelectItem>
                             <SelectItem value="black">純黑</SelectItem>
-                            <SelectItem value="indigo-950">午夜藍</SelectItem>
+                            <SelectItem value="indigo-950">午 midnight 藍</SelectItem>
                             <SelectItem value="zinc-900">深鐵灰</SelectItem>
                             <SelectItem value="rose-950">酒紅色</SelectItem>
                           </SelectContent>
