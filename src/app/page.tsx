@@ -26,7 +26,8 @@ import {
   Repeat,
   AlertCircle,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -88,6 +89,7 @@ export default function LyricSyncApp() {
   const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isIframe, setIsIframe] = useState(false);
+  const [isAppLaunched, setIsAppLaunched] = useState(false);
   
   // Screen Wake Lock state
   const [wakeLock, setWakeLock] = useState<any>(null);
@@ -114,7 +116,12 @@ export default function LyricSyncApp() {
 
   // Detect iframe on mount
   useEffect(() => {
-    setIsIframe(window.self !== window.top);
+    const isInIframe = window.self !== window.top;
+    setIsIframe(isInIframe);
+    // If not in iframe, we consider the app launched
+    if (!isInIframe) {
+      setIsAppLaunched(true);
+    }
   }, []);
 
   // Optimized Screen Wake Lock handling
@@ -146,11 +153,10 @@ export default function LyricSyncApp() {
       let errorMsg = err.message;
       
       if (err.name === 'NotAllowedError') {
-        const isInIframe = window.self !== window.top;
-        if (isInIframe) {
-          errorMsg = "權限被拒絕：偵測到您正在預覽視窗中使用。請點擊頂部按鈕「開啟獨立網頁」測試此功能。";
+        if (window.self !== window.top) {
+          errorMsg = "權限被拒絕：偵測到您正在預覽視窗中使用。請點擊上方按鈕「開啟獨立網頁」以正常運作。";
         } else {
-          errorMsg = "權限被拒絕：請確保使用手機 Chrome 直接開啟網址，不要透過 LINE/FB 開啟。";
+          errorMsg = "權限被拒絕：請確保使用手機 Chrome 直接開啟網址，不要透過 LINE/FB 等內置瀏覽器。";
         }
       }
       
@@ -168,7 +174,7 @@ export default function LyricSyncApp() {
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && isPlaying && !wakeLock) {
+      if (document.visibilityState === 'visible' && isPlaying) {
         await requestWakeLock();
       }
     };
@@ -264,7 +270,7 @@ export default function LyricSyncApp() {
       console.warn("Playback failed:", error);
       toast({ 
         title: "播放錯誤", 
-        description: "瀏覽器封鎖了自動播放，請手動點擊。", 
+        description: "瀏覽器封鎖了自動播放，請手動點擊播放按鈕。", 
         variant: "destructive" 
       });
     }
@@ -323,24 +329,6 @@ export default function LyricSyncApp() {
     }
   };
 
-  const readFileAsDataURL = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const readFileAsText = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsText(file);
-    });
-  };
-
   const handleFileUpload = async () => {
     if (!newMp3File) {
       toast({ title: "錯誤", description: "請選擇 MP3 檔案。", variant: "destructive" });
@@ -350,7 +338,11 @@ export default function LyricSyncApp() {
     setIsProcessing(true);
     try {
       const audioUrl = URL.createObjectURL(newMp3File);
-      const mp3DataUri = await readFileAsDataURL(newMp3File);
+      const reader = new FileReader();
+      const mp3DataUri = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(newMp3File);
+      });
       
       const finalTitle = newTitle || newMp3File.name.replace(/\.[^/.]+$/, "");
       const finalArtist = newArtist || "未知歌手";
@@ -361,7 +353,11 @@ export default function LyricSyncApp() {
       let isLrcFile = false;
 
       if (newLyricsFile) {
-        const fileContent = await readFileAsText(newLyricsFile);
+        const fileContent = await new Promise<string>((resolve) => {
+          const textReader = new FileReader();
+          textReader.onload = () => resolve(textReader.result as string);
+          textReader.readAsText(newLyricsFile);
+        });
         if (newLyricsFile.name.toLowerCase().endsWith('.lrc')) {
           lrcContent = fileContent;
           parsedLrc = parseLrc(lrcContent);
@@ -470,6 +466,10 @@ export default function LyricSyncApp() {
     }
   }, [activeLyricIndex, currentTime]);
 
+  const openInNewTab = () => {
+    window.open(window.location.href, '_blank');
+  };
+
   const getFontSizeClass = () => {
     switch (fontSize) {
       case 'sm': return 'text-xl md:text-2xl';
@@ -514,19 +514,44 @@ export default function LyricSyncApp() {
     }
   };
 
-  const openInNewTab = () => {
-    window.open(window.location.href, '_blank');
-  };
+  // Launch Overlay for iframe environments
+  if (isIframe && !isAppLaunched) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
+        <div className="w-24 h-24 bg-primary rounded-3xl flex items-center justify-center text-primary-foreground shadow-2xl shadow-primary/40 mb-8 animate-bounce">
+          <Music className="w-12 h-12" />
+        </div>
+        <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">LyricSync</h1>
+        <p className="text-slate-400 max-w-md mb-12 text-lg leading-relaxed">
+          偵測到您正在預覽環境中。為了支援<strong>「螢幕常亮」</strong>與<strong>「全螢幕」</strong>，請點擊下方按鈕在獨立網頁中開啟。
+        </p>
+        <Button 
+          size="lg" 
+          onClick={() => {
+            openInNewTab();
+            setIsAppLaunched(true); // Optional, fallback if window.open fails
+          }}
+          className="h-16 px-12 text-xl font-bold gap-3 rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-transform"
+        >
+          <Zap className="w-6 h-6 fill-current" />
+          立即啟動 App
+        </Button>
+        <p className="mt-8 text-slate-500 text-sm">
+          啟動後請使用 Chrome 瀏覽器以獲得最佳體驗
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-8">
-      {/* Environment Detection Banner */}
+      {/* Fallback Environment Banner if already launched but still in iframe */}
       {isIframe && (
         <div className="w-full max-w-7xl mb-4 p-4 bg-primary/10 border border-primary/20 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="flex items-center gap-3 text-primary">
             <Info className="w-5 h-5 shrink-0" />
             <p className="text-sm font-medium leading-tight">
-              偵測到預覽環境。為了支援<strong>「螢幕常亮」</strong>與<strong>「全螢幕」</strong>，請點擊右側按鈕開啟獨立分頁。
+              環境偵測：預覽視窗會限制「螢幕常亮」功能。
             </p>
           </div>
           <Button 
@@ -535,7 +560,7 @@ export default function LyricSyncApp() {
             className="shrink-0 gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
           >
             <ExternalLink className="w-4 h-4" />
-            開啟獨立網頁測試
+            開啟獨立網頁
           </Button>
         </div>
       )}
