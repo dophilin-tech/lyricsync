@@ -19,7 +19,10 @@ import {
   Type,
   Palette,
   Layout,
-  HardDrive
+  HardDrive,
+  Maximize,
+  Minimize,
+  Sun
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -80,7 +83,11 @@ export default function LyricSyncApp() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
+  // Screen Wake Lock state
+  const [wakeLock, setWakeLock] = useState<any>(null);
+
   // Deletion confirmation
   const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
 
@@ -99,6 +106,57 @@ export default function LyricSyncApp() {
   const lyricScrollRef = useRef<HTMLDivElement | null>(null);
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
+
+  // Handle Screen Wake Lock
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if ('wakeLock' in navigator && isPlaying) {
+        try {
+          const lock = await (navigator as any).wakeLock.request('screen');
+          setWakeLock(lock);
+          console.log("Wake Lock is active");
+          
+          lock.addEventListener('release', () => {
+            console.log("Wake Lock was released");
+            setWakeLock(null);
+          });
+        } catch (err: any) {
+          console.error(`${err.name}, ${err.message}`);
+        }
+      }
+    };
+
+    if (isPlaying) {
+      requestWakeLock();
+    } else {
+      if (wakeLock) {
+        wakeLock.release();
+        setWakeLock(null);
+      }
+    }
+
+    // Re-request wake lock when page becomes visible again
+    const handleVisibilityChange = async () => {
+      if (wakeLock !== null && document.visibilityState === 'visible' && isPlaying) {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (wakeLock) wakeLock.release();
+    };
+  }, [isPlaying]);
+
+  // Sync Fullscreen state
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   useEffect(() => {
     const loadTracks = async () => {
@@ -156,6 +214,20 @@ export default function LyricSyncApp() {
       });
     } else {
       audioRef.current.pause();
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        toast({ 
+          title: "Fullscreen Error", 
+          description: "Could not enter full screen mode. Please ensure you are interacting with the page.", 
+          variant: "destructive" 
+        });
+      });
+    } else {
+      document.exitFullscreen();
     }
   };
 
@@ -384,6 +456,23 @@ export default function LyricSyncApp() {
             <Music className="w-8 h-8" />
           </div>
           <h1 className="text-3xl font-bold tracking-tight text-primary">LyricSync</h1>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {wakeLock && (
+            <Badge variant="outline" className="hidden sm:flex gap-1.5 items-center text-green-600 bg-green-50 border-green-200">
+              <Sun className="w-3 h-3" /> Screen On
+            </Badge>
+          )}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={toggleFullscreen}
+            className="gap-2 h-9"
+          >
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+            <span className="hidden sm:inline">{isFullscreen ? "Exit Fullscreen" : "Fullscreen"}</span>
+          </Button>
         </div>
       </header>
 
@@ -796,3 +885,4 @@ export default function LyricSyncApp() {
     </div>
   );
 }
+
