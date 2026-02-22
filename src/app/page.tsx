@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
@@ -241,7 +240,7 @@ export default function LyricSyncApp() {
         requestWakeLock();
       }
     }
-  }, [currentTrackIndex]);
+  }, [currentTrackIndex, requestWakeLock, isPlaying, currentTrack]);
 
   const toggleFullscreen = (force?: boolean) => {
     if (force === true || !document.fullscreenElement) {
