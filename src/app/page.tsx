@@ -21,7 +21,8 @@ import {
   HardDrive,
   Maximize,
   Minimize,
-  Sun
+  Sun,
+  Repeat
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -34,7 +35,6 @@ import {
   DialogTitle, 
   DialogTrigger,
   DialogDescription,
-  DialogDescription as DialogDesc,
   DialogFooter
 } from "@/components/ui/dialog";
 import {
@@ -58,7 +58,6 @@ import {
 } from "@/components/ui/select";
 import { parseLrc, LrcLine, formatTime } from "@/lib/lrc-parser";
 import { generateLrcFromMp3AndLyrics } from "@/ai/flows/generate-lrc-from-mp3-and-lyrics";
-import { correctLyricSynchronization } from "@/ai/flows/correct-lyric-synchronization";
 import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { Badge } from "@/components/ui/badge";
@@ -110,21 +109,15 @@ export default function LyricSyncApp() {
   // Handle Screen Wake Lock
   useEffect(() => {
     const requestWakeLock = async () => {
-      // Feature detection and check if we are in a secure context (required by most browsers)
       if ('wakeLock' in navigator && isPlaying) {
         try {
-          // Check for permission policy if it exists (some browsers might block it in iframes)
           const lock = await (navigator as any).wakeLock.request('screen');
           setWakeLock(lock);
-          console.log("Wake Lock is active");
-          
           lock.addEventListener('release', () => {
-            console.log("Wake Lock was released");
             setWakeLock(null);
           });
         } catch (err: any) {
-          // Using console.warn instead of console.error to avoid triggering the development error overlay.
-          // Wake lock is a progressive enhancement and shouldn't crash the app if it's unavailable or blocked.
+          // Changed console.error to warn to avoid NextJS crash overlay for permission issues
           console.warn(`Wake Lock restricted or unavailable: ${err.name}, ${err.message}`);
         }
       }
@@ -139,7 +132,6 @@ export default function LyricSyncApp() {
       }
     }
 
-    // Re-request wake lock when page becomes visible again
     const handleVisibilityChange = async () => {
       if (wakeLock !== null && document.visibilityState === 'visible' && isPlaying) {
         requestWakeLock();
@@ -168,6 +160,7 @@ export default function LyricSyncApp() {
         const savedTracks = await getAllTracksFromDB();
         const tracksWithUrls = await Promise.all(savedTracks.map(async (st) => {
           const audioUrl = URL.createObjectURL(st.mp3Blob);
+          // Pre-generate data URI for AI flows if needed
           const mp3DataUri = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
@@ -209,29 +202,30 @@ export default function LyricSyncApp() {
     }
   }, [currentTrackIndex]);
 
+  const toggleFullscreen = (force?: boolean) => {
+    if (force === true || !document.fullscreenElement) {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.warn("Fullscreen request failed", err);
+        });
+      }
+    } else if (force === false || document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+  };
+
   const togglePlay = () => {
     if (!audioRef.current || !currentTrack) return;
     if (audioRef.current.paused) {
+      // Attempt to go fullscreen on start as requested
+      toggleFullscreen(true);
+      
       audioRef.current.play().catch(error => {
         console.warn("Playback failed:", error);
         toast({ title: "Playback Error", description: "Browser blocked audio playback.", variant: "destructive" });
       });
     } else {
       audioRef.current.pause();
-    }
-  };
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => {
-        toast({ 
-          title: "Fullscreen Error", 
-          description: "Could not enter full screen mode. Please ensure you are interacting with the page.", 
-          variant: "destructive" 
-        });
-      });
-    } else {
-      document.exitFullscreen();
     }
   };
 
@@ -260,6 +254,16 @@ export default function LyricSyncApp() {
     if (nextIndex >= playlist.length) nextIndex = 0;
     if (nextIndex < 0) nextIndex = playlist.length - 1;
     setCurrentTrackIndex(nextIndex);
+  };
+
+  const handleTrackEnded = () => {
+    // Continuous playback logic: move to next and ensure isPlaying stays true
+    if (playlist.length > 0) {
+      setIsPlaying(true);
+      skipTrack('next');
+    } else {
+      setIsPlaying(false);
+    }
   };
 
   const readFileAsDataURL = (file: File): Promise<string> => {
@@ -291,6 +295,7 @@ export default function LyricSyncApp() {
       const audioUrl = URL.createObjectURL(newMp3File);
       const mp3DataUri = await readFileAsDataURL(newMp3File);
       
+      // Auto-title from filename if empty
       const finalTitle = newTitle || newMp3File.name.replace(/\.[^/.]+$/, "");
       const finalArtist = newArtist || "Unknown Artist";
 
@@ -339,6 +344,7 @@ export default function LyricSyncApp() {
         createdAt: Date.now()
       };
 
+      // Save to IndexedDB
       await saveTrackToDB(trackData);
 
       const newTrack: Track = {
@@ -354,6 +360,7 @@ export default function LyricSyncApp() {
         setIsPlaying(true);
       }
       
+      // Reset form
       setNewTitle("");
       setNewArtist("");
       setNewMp3File(null);
@@ -471,7 +478,7 @@ export default function LyricSyncApp() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={toggleFullscreen}
+            onClick={() => toggleFullscreen()}
             className="gap-2 h-9"
           >
             {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
@@ -481,7 +488,7 @@ export default function LyricSyncApp() {
       </header>
 
       <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-stretch">
-        {/* Sidebar: Playlist & Controls */}
+        {/* Sidebar Left: Playlist & Playback Toggle */}
         <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur order-2 lg:order-1">
           <div className="p-4 border-b flex flex-col gap-4 bg-muted/30">
             <div className="flex items-center justify-between">
@@ -498,7 +505,6 @@ export default function LyricSyncApp() {
               </div>
             </div>
 
-            {/* Play/Pause Control directly on top of playlist */}
             <div className="flex gap-2">
               <Button 
                 onClick={togglePlay} 
@@ -528,9 +534,9 @@ export default function LyricSyncApp() {
                 <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Upload New Track</DialogTitle>
-                    <DialogDesc>
+                    <DialogDescription>
                       Add an MP3 and lyrics. Files will be saved locally on your device.
-                    </DialogDesc>
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
@@ -593,7 +599,10 @@ export default function LyricSyncApp() {
               playlist.map((track, index) => (
                 <div 
                   key={track.id}
-                  onClick={() => setCurrentTrackIndex(index)}
+                  onClick={() => {
+                    setCurrentTrackIndex(index);
+                    setIsPlaying(true);
+                  }}
                   className={`group p-4 flex items-center gap-4 cursor-pointer border-b last:border-0 transition-colors ${index === currentTrackIndex ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-muted/50'}`}
                 >
                   <div className="relative w-8 h-8 bg-primary/20 rounded-md flex items-center justify-center text-primary shrink-0">
@@ -627,7 +636,7 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
-        {/* Center: Lyric Display (Clickable) */}
+        {/* Center: Lyrics Display (Toggles Play/Pause on click) */}
         <Card 
           onClick={togglePlay}
           className={cn(
@@ -638,7 +647,7 @@ export default function LyricSyncApp() {
         >
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20 pointer-events-none" />
           
-          {/* Visual indicator for click-to-toggle */}
+          {/* Overlay Hint */}
           <div className="absolute top-4 right-4 opacity-0 group-hover/lyrics:opacity-20 transition-opacity pointer-events-none">
              {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8" />}
           </div>
@@ -680,6 +689,7 @@ export default function LyricSyncApp() {
                     </div>
                   )}
                 </div>
+                {/* Visual Gradients */}
                 <div 
                   className="absolute top-0 left-0 right-0 h-32 pointer-events-none" 
                   style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }}
@@ -700,7 +710,7 @@ export default function LyricSyncApp() {
           )}
         </Card>
 
-        {/* Right Panel: Now Playing & Visual Settings */}
+        {/* Sidebar Right: Controls & Fine-tuning */}
         <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md order-3">
           <div className="p-4 border-b bg-muted/30">
             <h2 className="font-semibold flex items-center gap-2">
@@ -747,6 +757,11 @@ export default function LyricSyncApp() {
                     <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => skipTrack('next')}>
                       <SkipForward className="w-6 h-6" />
                     </Button>
+                  </div>
+
+                  <div className="flex items-center justify-center gap-2 text-xs font-bold text-muted-foreground opacity-70">
+                    <Repeat className="w-3 h-3 text-primary" />
+                    <span>Continuous Play Enabled</span>
                   </div>
 
                   <Separator />
@@ -840,7 +855,7 @@ export default function LyricSyncApp() {
                     <Button 
                       variant="outline" 
                       className="w-full justify-start gap-2 h-9 text-xs" 
-                      onClick={() => {}} // Correct functionality placeholder
+                      onClick={() => {}} 
                       disabled={isProcessing || !currentTrack.lrcContent}
                     >
                       <Sparkles className="w-3.5 h-3.5 text-orange-500" /> 
@@ -859,7 +874,7 @@ export default function LyricSyncApp() {
         </Card>
       </main>
 
-      {/* Confirmation Dialog */}
+      {/* Deletion confirmation dialog */}
       <AlertDialog open={!!trackToDelete} onOpenChange={(open) => !open && setTrackToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -881,7 +896,7 @@ export default function LyricSyncApp() {
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
-        onEnded={() => skipTrack('next')}
+        onEnded={handleTrackEnded}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
       />
