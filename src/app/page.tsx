@@ -107,7 +107,7 @@ export default function LyricSyncApp() {
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
-  // Handle Screen Wake Lock with improved reliability and visual error reporting
+  // Optimized Screen Wake Lock handling
   useEffect(() => {
     let lock: any = null;
 
@@ -125,11 +125,11 @@ export default function LyricSyncApp() {
           });
         } catch (err: any) {
           setWakeLock(null);
-          // Show the error to the user via Toast
+          // Show details to help diagnosis
           toast({
             variant: "destructive",
             title: "螢幕常亮功能受限",
-            description: `${err.name}: ${err.message}. 請確保在安全的 HTTPS 環境下使用。`,
+            description: `${err.name}: ${err.message}. 請確保在安全的 HTTPS 環境下使用。若是 Android Chrome，請確認未開啟省電模式。`,
           });
         }
       }
