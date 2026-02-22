@@ -41,7 +41,8 @@ interface Track {
   id: string;
   title: string;
   artist: string;
-  mp3DataUri: string;
+  audioUrl: string; // Blob URL for playback
+  mp3DataUri: string; // Base64 for AI flows
   lyricsText?: string;
   lrcContent?: string;
   parsedLrc?: LrcLine[];
@@ -77,21 +78,37 @@ export default function LyricSyncApp() {
 
   useEffect(() => {
     if (currentTrack && audioRef.current) {
-      audioRef.current.src = currentTrack.mp3DataUri;
+      // Load the new source
+      audioRef.current.src = currentTrack.audioUrl;
+      audioRef.current.load();
+      
+      // Attempt to play if it was already playing or manually selected
       if (isPlaying) {
-        audioRef.current.play().catch(e => console.error("Playback failed", e));
+        const playPromise = audioRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Playback failed:", error);
+            setIsPlaying(false);
+          });
+        }
       }
     }
   }, [currentTrack]);
 
   const togglePlay = () => {
     if (!audioRef.current || !currentTrack) return;
+    
     if (isPlaying) {
       audioRef.current.pause();
     } else {
-      audioRef.current.play();
+      const playPromise = audioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.error("Manual playback failed:", error);
+          toast({ title: "Playback Error", description: "Could not start audio playback.", variant: "destructive" });
+        });
+      }
     }
-    setIsPlaying(!isPlaying);
   };
 
   const handleTimeUpdate = () => {
@@ -147,6 +164,8 @@ export default function LyricSyncApp() {
 
     setIsProcessing(true);
     try {
+      // We use Blob URL for playback performance and Data URI for AI processing
+      const audioUrl = URL.createObjectURL(newMp3File);
       const mp3DataUri = await readFileAsDataURL(newMp3File);
       
       let lyricsToProcess = newLyricsText;
@@ -188,6 +207,7 @@ export default function LyricSyncApp() {
         id: Date.now().toString(),
         title: newTitle,
         artist: newArtist || "Unknown Artist",
+        audioUrl,
         mp3DataUri,
         lyricsText: lyricsToProcess || (isLrcFile ? lrcContent.replace(/\[.*?\]/g, '') : ""),
         lrcContent,
@@ -195,7 +215,10 @@ export default function LyricSyncApp() {
       };
 
       setPlaylist(prev => [...prev, newTrack]);
-      if (currentTrackIndex === -1) setCurrentTrackIndex(0);
+      if (currentTrackIndex === -1) {
+        setCurrentTrackIndex(0);
+        setIsPlaying(true);
+      }
       
       // Reset form
       setNewTitle("");
@@ -530,6 +553,8 @@ export default function LyricSyncApp() {
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={() => skipTrack('next')}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
       />
       <Toaster />
     </div>
