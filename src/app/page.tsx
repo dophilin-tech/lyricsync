@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { 
   Play, 
   Pause, 
@@ -23,7 +23,9 @@ import {
   Maximize,
   Minimize,
   Sun,
-  Repeat
+  Repeat,
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -87,6 +89,7 @@ export default function LyricSyncApp() {
   
   // Screen Wake Lock state
   const [wakeLock, setWakeLock] = useState<any>(null);
+  const [wakeLockError, setWakeLockError] = useState<string | null>(null);
 
   // Deletion confirmation
   const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
@@ -108,35 +111,34 @@ export default function LyricSyncApp() {
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
   // Optimized Screen Wake Lock handling
-  useEffect(() => {
-    let lock: any = null;
+  const requestWakeLock = useCallback(async () => {
+    if (!('wakeLock' in navigator)) {
+      setWakeLockError("瀏覽器不支援 Wake Lock API");
+      return;
+    }
 
-    const requestWakeLock = async () => {
-      if ('wakeLock' in navigator && isPlaying) {
-        try {
-          lock = await (navigator as any).wakeLock.request('screen');
-          setWakeLock(lock);
-          lock.addEventListener('release', () => {
-            if (document.visibilityState === 'visible' && isPlaying) {
-              requestWakeLock(); // Auto-reattain if released unexpectedly while visible
-            } else {
-              setWakeLock(null);
-            }
-          });
-        } catch (err: any) {
-          setWakeLock(null);
-          // Show details to help diagnosis
-          toast({
-            variant: "destructive",
-            title: "螢幕常亮功能受限",
-            description: `${err.name}: ${err.message}. 請確保在安全的 HTTPS 環境下使用。若是 Android Chrome，請確認未開啟省電模式。`,
-          });
-        }
+    try {
+      const lock = await (navigator as any).wakeLock.request('screen');
+      setWakeLock(lock);
+      setWakeLockError(null);
+      
+      lock.addEventListener('release', () => {
+        setWakeLock(null);
+      });
+    } catch (err: any) {
+      setWakeLock(null);
+      let errorMsg = err.message;
+      if (err.name === 'NotAllowedError') {
+        errorMsg = "權限被拒絕。請確保在 HTTPS 環境下直接開啟網址，不要透過 iframe 或其他 App 開啟。";
       }
-    };
+      setWakeLockError(errorMsg);
+      console.warn("Wake Lock 獲取失敗:", err);
+    }
+  }, []);
 
+  useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && isPlaying) {
+      if (document.visibilityState === 'visible' && isPlaying && !wakeLock) {
         await requestWakeLock();
       }
     };
@@ -149,13 +151,14 @@ export default function LyricSyncApp() {
         wakeLock.release().catch(() => {});
         setWakeLock(null);
       }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     }
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (lock) lock.release().catch(() => {});
+      if (wakeLock) wakeLock.release().catch(() => {});
     };
-  }, [isPlaying]);
+  }, [isPlaying, requestWakeLock]);
 
   // Sync Fullscreen state
   useEffect(() => {
@@ -475,11 +478,23 @@ export default function LyricSyncApp() {
         </div>
         
         <div className="flex items-center gap-2">
-          {wakeLock && (
+          {wakeLock ? (
             <Badge variant="outline" className="flex gap-1.5 items-center text-green-600 bg-green-50 border-green-200">
               <Sun className="w-3 h-3" /> 螢幕常亮已開啟
             </Badge>
-          )}
+          ) : isPlaying ? (
+            <Badge 
+              variant="outline" 
+              className="flex gap-1.5 items-center text-destructive bg-destructive/10 border-destructive cursor-pointer hover:bg-destructive/20"
+              onClick={() => {
+                requestWakeLock();
+                toast({ title: "嘗試重新獲取", description: "正在嘗試獲取螢幕喚醒鎖定..." });
+              }}
+            >
+              <AlertCircle className="w-3 h-3" /> {wakeLockError ? "喚醒受限 (點擊重試)" : "喚醒關閉"}
+              <RefreshCw className="w-2.5 h-2.5 ml-1 animate-spin-slow" />
+            </Badge>
+          ) : null}
           <Button 
             variant="outline" 
             size="sm" 
