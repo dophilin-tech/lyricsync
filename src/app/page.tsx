@@ -388,7 +388,7 @@ export default function LyricSyncApp() {
       </header>
 
       <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-stretch">
-        {/* Sidebar: Playlist & Upload */}
+        {/* Sidebar: Playlist & Controls */}
         <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur order-2 lg:order-1">
           <div className="p-4 border-b flex flex-col gap-4 bg-muted/30">
             <div className="flex items-center justify-between">
@@ -405,68 +405,90 @@ export default function LyricSyncApp() {
               </div>
             </div>
 
-            <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 bg-secondary hover:bg-secondary/90 shadow-lg w-full h-11 text-base">
-                  <Upload className="w-5 h-5" /> Upload New Song
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Upload New Track</DialogTitle>
-                  <DialogDescription>
-                    Add an MP3 and lyrics. Files will be saved locally on your device.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="mp3">MP3 File *</Label>
-                    <Input 
-                      id="mp3" 
-                      type="file" 
-                      accept="audio/mpeg" 
-                      onChange={e => setNewMp3File(e.target.files ? e.target.files[0] : null)} 
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="title">Song Title (Optional)</Label>
-                    <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Bohemian Rhapsody" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="artist">Artist Name (Optional)</Label>
-                    <Input id="artist" value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="e.g. Queen" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="lyricFile">Lyric File (.txt, .lrc)</Label>
-                    <Input 
-                      id="lyricFile" 
-                      type="file" 
-                      accept=".txt,.lrc" 
-                      onChange={e => setNewLyricsFile(e.target.files ? e.target.files[0] : null)} 
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="lyrics">Or Paste Lyrics</Label>
-                    <textarea 
-                      id="lyrics" 
-                      className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      value={newLyricsText}
-                      onChange={e => setNewLyricsText(e.target.value)}
-                      placeholder="Paste lyrics here..."
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button 
-                    onClick={handleFileUpload} 
-                    disabled={isProcessing || !newMp3File}
-                    className="w-full"
-                  >
-                    {isProcessing ? "Analyzing..." : "Start AI Sync"}
+            {/* Play/Pause Control directly on top of playlist */}
+            <div className="flex gap-2">
+              <Button 
+                onClick={togglePlay} 
+                disabled={!currentTrack}
+                className={cn(
+                  "flex-1 gap-2 h-11 shadow-lg text-base",
+                  isPlaying ? "bg-orange-600 hover:bg-orange-700" : "bg-primary hover:bg-primary/90"
+                )}
+              >
+                {isPlaying ? (
+                  <>
+                    <Pause className="w-5 h-5 fill-current" /> Stop
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-5 h-5 fill-current" /> Start
+                  </>
+                )}
+              </Button>
+              
+              <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="secondary" size="icon" className="h-11 w-11 shadow-lg shrink-0">
+                    <Upload className="w-5 h-5" />
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Upload New Track</DialogTitle>
+                    <DialogDescription>
+                      Add an MP3 and lyrics. Files will be saved locally on your device.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="mp3">MP3 File *</Label>
+                      <Input 
+                        id="mp3" 
+                        type="file" 
+                        accept="audio/mpeg" 
+                        onChange={e => setNewMp3File(e.target.files ? e.target.files[0] : null)} 
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="title">Song Title (Optional)</Label>
+                      <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Bohemian Rhapsody" />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="artist">Artist Name (Optional)</Label>
+                      <Input id="artist" value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="e.g. Queen" />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="lyricFile">Lyric File (.txt, .lrc)</Label>
+                      <Input 
+                        id="lyricFile" 
+                        type="file" 
+                        accept=".txt,.lrc" 
+                        onChange={e => setNewLyricsFile(e.target.files ? e.target.files[0] : null)} 
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="lyrics">Or Paste Lyrics</Label>
+                      <textarea 
+                        id="lyrics" 
+                        className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        value={newLyricsText}
+                        onChange={e => setNewLyricsText(e.target.value)}
+                        placeholder="Paste lyrics here..."
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button 
+                      onClick={handleFileUpload} 
+                      disabled={isProcessing || !newMp3File}
+                      className="w-full"
+                    >
+                      {isProcessing ? "Analyzing..." : "Start AI Sync"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
           <ScrollArea className="flex-1 min-h-[300px]">
             {playlist.length === 0 && !isLoadingDB ? (
@@ -512,14 +534,22 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
-        {/* Center: Lyric Display */}
-        <Card className={cn(
-          "lg:col-span-6 h-[500px] lg:h-[650px] relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-3xl order-1 lg:order-2",
-          getBgThemeClass(),
-          "text-white"
-        )}>
+        {/* Center: Lyric Display (Clickable) */}
+        <Card 
+          onClick={togglePlay}
+          className={cn(
+            "lg:col-span-6 h-[500px] lg:h-[650px] relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-3xl order-1 lg:order-2 cursor-pointer group/lyrics",
+            getBgThemeClass(),
+            "text-white"
+          )}
+        >
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20 pointer-events-none" />
           
+          {/* Visual indicator for click-to-toggle */}
+          <div className="absolute top-4 right-4 opacity-0 group-hover/lyrics:opacity-20 transition-opacity pointer-events-none">
+             {isPlaying ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8" />}
+          </div>
+
           {currentTrack ? (
             <div className="relative h-full flex flex-col">
               <div className="flex-1 overflow-hidden relative">
@@ -577,7 +607,7 @@ export default function LyricSyncApp() {
           )}
         </Card>
 
-        {/* Right Panel: Controls & Settings */}
+        {/* Right Panel: Now Playing & Visual Settings */}
         <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md order-3">
           <div className="p-4 border-b bg-muted/30">
             <h2 className="font-semibold flex items-center gap-2">
