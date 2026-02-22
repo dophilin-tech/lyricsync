@@ -510,7 +510,7 @@ export default function LyricSyncApp() {
         <div className="flex items-center gap-2">
           {wakeLock ? (
             <Badge variant="outline" className="flex gap-1.5 items-center text-green-600 bg-green-50 border-green-200">
-              <Sun className="w-3 h-3" /> 螢幕常亮已開啟
+              <Sun className="w-3 h-3" /> 螢幕常亮已啟動
             </Badge>
           ) : isPlaying ? (
             <Badge 
