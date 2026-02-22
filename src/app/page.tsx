@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
@@ -116,7 +117,7 @@ export default function LyricSyncApp() {
     setIsIframe(window.self !== window.top);
   }, []);
 
-  // Optimized Screen Wake Lock handling with explicit User Gesture support
+  // Optimized Screen Wake Lock handling
   const requestWakeLock = useCallback(async (isManual = false) => {
     if (!('wakeLock' in navigator)) {
       setWakeLockError("瀏覽器不支援 Wake Lock API");
@@ -124,7 +125,6 @@ export default function LyricSyncApp() {
     }
 
     try {
-      // If we already have a lock, release it first to be clean
       if (wakeLock) {
         await wakeLock.release();
         setWakeLock(null);
@@ -145,7 +145,6 @@ export default function LyricSyncApp() {
       setWakeLock(null);
       let errorMsg = err.message;
       
-      // Detailed diagnostics for common errors
       if (err.name === 'NotAllowedError') {
         const isInIframe = window.self !== window.top;
         if (isInIframe) {
@@ -235,19 +234,6 @@ export default function LyricSyncApp() {
     }
   }, [volume]);
 
-  useEffect(() => {
-    if (currentTrack && audioRef.current) {
-      audioRef.current.src = currentTrack.audioUrl;
-      audioRef.current.load();
-      setSyncOffset(0);
-      setCurrentTime(0);
-      if (isPlaying) {
-        audioRef.current.play().catch(e => console.warn("Auto-play prevented", e));
-        requestWakeLock();
-      }
-    }
-  }, [currentTrackIndex, requestWakeLock, isPlaying, currentTrack]);
-
   const toggleFullscreen = (force?: boolean) => {
     if (force === true || !document.fullscreenElement) {
       if (!document.fullscreenElement) {
@@ -260,15 +246,42 @@ export default function LyricSyncApp() {
     }
   };
 
-  const togglePlay = () => {
-    if (!audioRef.current || !currentTrack) return;
-    if (audioRef.current.paused) {
+  const playTrack = async (index: number) => {
+    if (index < 0 || index >= playlist.length || !audioRef.current) return;
+    
+    const track = playlist[index];
+    setCurrentTrackIndex(index);
+    
+    // Set source and play directly in the same call stack
+    audioRef.current.src = track.audioUrl;
+    audioRef.current.load();
+    
+    try {
+      await audioRef.current.play();
       requestWakeLock();
       toggleFullscreen(true);
-      
-      audioRef.current.play().catch(error => {
-        console.warn("Playback failed:", error);
-        toast({ title: "播放錯誤", description: "瀏覽器封鎖了自動播放，請手動點擊。", variant: "destructive" });
+    } catch (error) {
+      console.warn("Playback failed:", error);
+      toast({ 
+        title: "播放錯誤", 
+        description: "瀏覽器封鎖了自動播放，請手動點擊。", 
+        variant: "destructive" 
+      });
+    }
+  };
+
+  const togglePlay = () => {
+    if (!audioRef.current || currentTrackIndex === -1) {
+      if (playlist.length > 0) playTrack(0);
+      return;
+    }
+
+    if (audioRef.current.paused) {
+      audioRef.current.play().then(() => {
+        requestWakeLock();
+        toggleFullscreen(true);
+      }).catch(err => {
+        console.warn(err);
       });
     } else {
       audioRef.current.pause();
@@ -299,12 +312,11 @@ export default function LyricSyncApp() {
     let nextIndex = direction === 'next' ? currentTrackIndex + 1 : currentTrackIndex - 1;
     if (nextIndex >= playlist.length) nextIndex = 0;
     if (nextIndex < 0) nextIndex = playlist.length - 1;
-    setCurrentTrackIndex(nextIndex);
+    playTrack(nextIndex);
   };
 
   const handleTrackEnded = () => {
     if (playlist.length > 0) {
-      setIsPlaying(true);
       skipTrack('next');
     } else {
       setIsPlaying(false);
@@ -397,10 +409,11 @@ export default function LyricSyncApp() {
         parsedLrc
       };
 
-      setPlaylist(prev => [...prev, newTrack]);
+      const newPlaylist = [...playlist, newTrack];
+      setPlaylist(newPlaylist);
+      
       if (currentTrackIndex === -1) {
-        setCurrentTrackIndex(0);
-        setIsPlaying(true);
+        playTrack(newPlaylist.length - 1);
       }
       
       setNewTitle("");
@@ -585,7 +598,6 @@ export default function LyricSyncApp() {
             <div className="flex gap-2">
               <Button 
                 onClick={togglePlay} 
-                disabled={!currentTrack}
                 className={cn(
                   "flex-1 gap-2 h-11 shadow-lg text-base",
                   isPlaying ? "bg-orange-600 hover:bg-orange-700" : "bg-primary hover:bg-primary/90"
@@ -676,12 +688,7 @@ export default function LyricSyncApp() {
               playlist.map((track, index) => (
                 <div 
                   key={track.id}
-                  onClick={() => {
-                    setCurrentTrackIndex(index);
-                    setIsPlaying(true);
-                    requestWakeLock();
-                    toggleFullscreen(true);
-                  }}
+                  onClick={() => playTrack(index)}
                   className={`group p-4 flex items-center gap-4 cursor-pointer border-b last:border-0 transition-colors ${index === currentTrackIndex ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-muted/50'}`}
                 >
                   <div className="relative w-8 h-8 bg-primary/20 rounded-md flex items-center justify-center text-primary shrink-0">
