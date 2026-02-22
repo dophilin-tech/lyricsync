@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { 
   Play, 
   Pause, 
@@ -14,12 +15,12 @@ import {
   Trash2,
   ListMusic,
   CheckCircle2,
-  Settings2,
-  Timer
+  Timer,
+  Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Dialog, 
@@ -38,13 +39,14 @@ import { correctLyricSynchronization } from "@/ai/flows/correct-lyric-synchroniz
 import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 interface Track {
   id: string;
   title: string;
   artist: string;
-  audioUrl: string; // Blob URL for playback
-  mp3DataUri: string; // Base64 for AI flows
+  audioUrl: string;
+  mp3DataUri: string;
   lyricsText?: string;
   lrcContent?: string;
   parsedLrc?: LrcLine[];
@@ -57,11 +59,10 @@ export default function LyricSyncApp() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.8);
-  const [syncOffset, setSyncOffset] = useState(0); // Offset in seconds
+  const [syncOffset, setSyncOffset] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
-  // New Upload Form State
   const [newTitle, setNewTitle] = useState("");
   const [newArtist, setNewArtist] = useState("");
   const [newMp3File, setNewMp3File] = useState<File | null>(null);
@@ -83,8 +84,7 @@ export default function LyricSyncApp() {
     if (currentTrack && audioRef.current) {
       audioRef.current.src = currentTrack.audioUrl;
       audioRef.current.load();
-      setSyncOffset(0); // Reset offset for new track
-      
+      setSyncOffset(0);
       if (isPlaying) {
         audioRef.current.play().catch(e => console.log("Auto-play prevented", e));
       }
@@ -93,7 +93,6 @@ export default function LyricSyncApp() {
 
   const togglePlay = () => {
     if (!audioRef.current || !currentTrack) return;
-    
     if (audioRef.current.paused) {
       audioRef.current.play().catch(error => {
         console.error("Playback failed:", error);
@@ -150,8 +149,8 @@ export default function LyricSyncApp() {
   };
 
   const handleFileUpload = async () => {
-    if (!newMp3File || !newTitle) {
-      toast({ title: "Error", description: "Title and MP3 file are required.", variant: "destructive" });
+    if (!newMp3File) {
+      toast({ title: "Error", description: "MP3 file is required.", variant: "destructive" });
       return;
     }
 
@@ -160,6 +159,10 @@ export default function LyricSyncApp() {
       const audioUrl = URL.createObjectURL(newMp3File);
       const mp3DataUri = await readFileAsDataURL(newMp3File);
       
+      // Auto-title from filename if not provided
+      const finalTitle = newTitle || newMp3File.name.replace(/\.[^/.]+$/, "");
+      const finalArtist = newArtist || "Unknown Artist";
+
       let lyricsToProcess = newLyricsText;
       let lrcContent = "";
       let parsedLrc: LrcLine[] = [];
@@ -182,8 +185,8 @@ export default function LyricSyncApp() {
           const aiRes = await generateLrcFromMp3AndLyrics({
             mp3DataUri,
             lyricsText: lyricsToProcess,
-            songTitle: newTitle,
-            artist: newArtist
+            songTitle: finalTitle,
+            artist: finalArtist
           });
           lrcContent = aiRes.lrcContent;
           parsedLrc = parseLrc(lrcContent);
@@ -196,8 +199,8 @@ export default function LyricSyncApp() {
 
       const newTrack: Track = {
         id: Date.now().toString(),
-        title: newTitle,
-        artist: newArtist || "Unknown Artist",
+        title: finalTitle,
+        artist: finalArtist,
         audioUrl,
         mp3DataUri,
         lyricsText: lyricsToProcess || (isLrcFile ? lrcContent.replace(/\[.*?\]/g, '') : ""),
@@ -255,7 +258,6 @@ export default function LyricSyncApp() {
     }
   };
 
-  // Adjust playback time with user offset for lyric matching
   const adjustedCurrentTime = currentTime - syncOffset;
   const activeLyricIndex = currentTrack?.parsedLrc?.findLastIndex(l => l.time <= adjustedCurrentTime) ?? -1;
 
@@ -270,7 +272,7 @@ export default function LyricSyncApp() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center p-4 md:p-8">
-      <header className="w-full max-w-6xl flex justify-between items-center mb-8">
+      <header className="w-full max-w-7xl flex justify-between items-center mb-8">
         <div className="flex items-center gap-3">
           <div className="bg-primary p-2 rounded-xl text-primary-foreground shadow-lg shadow-primary/20">
             <Music className="w-8 h-8" />
@@ -288,18 +290,10 @@ export default function LyricSyncApp() {
             <DialogHeader>
               <DialogTitle>Upload New Track</DialogTitle>
               <DialogDescription>
-                Add an MP3 and lyrics. Our AI uses multimodal analysis to "listen" and sync!
+                Add an MP3 and lyrics. We'll automatically use the filename if you don't provide a title.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="title">Song Title *</Label>
-                <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Bohemian Rhapsody" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="artist">Artist Name</Label>
-                <Input id="artist" value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="e.g. Queen" />
-              </div>
               <div className="grid gap-2">
                 <Label htmlFor="mp3">MP3 File *</Label>
                 <Input 
@@ -308,6 +302,14 @@ export default function LyricSyncApp() {
                   accept="audio/mpeg" 
                   onChange={e => setNewMp3File(e.target.files ? e.target.files[0] : null)} 
                 />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="title">Song Title (Optional)</Label>
+                <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Bohemian Rhapsody" />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="artist">Artist Name (Optional)</Label>
+                <Input id="artist" value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="e.g. Queen" />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="lyricFile">Lyric File (.txt, .lrc)</Label>
@@ -332,60 +334,56 @@ export default function LyricSyncApp() {
             <DialogFooter>
               <Button 
                 onClick={handleFileUpload} 
-                disabled={isProcessing || !newMp3File || !newTitle}
+                disabled={isProcessing || !newMp3File}
                 className="w-full"
               >
-                {isProcessing ? "Analyzing Audio..." : "Start AI Sync"}
+                {isProcessing ? "Analyzing..." : "Start AI Sync"}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
       </header>
 
-      <main className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 flex-1 items-start">
+      <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 items-stretch">
         {/* Playlist Sidebar */}
-        <Card className="lg:col-span-4 h-[600px] flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur">
+        <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur">
           <div className="p-4 border-b flex items-center justify-between bg-muted/30">
             <h2 className="font-semibold flex items-center gap-2">
               <ListMusic className="w-4 h-4 text-primary" /> Playlist
             </h2>
             <span className="text-xs text-muted-foreground font-medium">{playlist.length} Tracks</span>
           </div>
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-[300px]">
             {playlist.length === 0 ? (
               <div className="p-12 text-center text-muted-foreground">
                 <Music className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                <p>No tracks added yet.</p>
+                <p className="text-sm">No tracks added.</p>
               </div>
             ) : (
               playlist.map((track, index) => (
                 <div 
                   key={track.id}
-                  onClick={() => {
-                    setCurrentTrackIndex(index);
-                  }}
+                  onClick={() => setCurrentTrackIndex(index)}
                   className={`group p-4 flex items-center gap-4 cursor-pointer border-b last:border-0 transition-colors ${index === currentTrackIndex ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-muted/50'}`}
                 >
-                  <div className="relative w-10 h-10 bg-primary/20 rounded-md flex items-center justify-center text-primary group-hover:bg-primary/30 transition-colors">
+                  <div className="relative w-8 h-8 bg-primary/20 rounded-md flex items-center justify-center text-primary shrink-0">
                     {index === currentTrackIndex && isPlaying ? (
-                      <div className="flex gap-0.5 items-end h-3">
-                        <div className="w-1 bg-primary animate-bounce delay-75 h-full"></div>
-                        <div className="w-1 bg-primary animate-bounce delay-150 h-2/3"></div>
-                        <div className="w-1 bg-primary animate-bounce delay-0 h-full"></div>
+                      <div className="flex gap-0.5 items-end h-2.5">
+                        <div className="w-0.5 bg-primary animate-bounce h-full"></div>
+                        <div className="w-0.5 bg-primary animate-bounce delay-150 h-2/3"></div>
                       </div>
                     ) : (
-                      <Music className="w-5 h-5" />
+                      <Music className="w-4 h-4" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate leading-none mb-1">{track.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
+                    <p className="text-sm font-medium truncate leading-none mb-1">{track.title}</p>
+                    <p className="text-[10px] text-muted-foreground truncate uppercase font-bold">{track.artist}</p>
                   </div>
-                  {track.parsedLrc && track.parsedLrc.length > 0 && <CheckCircle2 className="w-4 h-4 text-secondary shrink-0" />}
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:bg-destructive/10"
                     onClick={(e) => {
                       e.stopPropagation();
                       const newPlaylist = playlist.filter(t => t.id !== track.id);
@@ -398,7 +396,7 @@ export default function LyricSyncApp() {
                       }
                     }}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
               ))
@@ -407,163 +405,156 @@ export default function LyricSyncApp() {
         </Card>
 
         {/* Player & Karaoke Area */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
-          <Card className="flex-1 min-h-[450px] relative overflow-hidden border-none shadow-2xl bg-slate-900 text-white rounded-3xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-transparent to-teal-900/40 pointer-events-none" />
-            
-            {currentTrack ? (
-              <div className="relative h-full flex flex-col p-8">
-                <div className="flex justify-between items-start mb-8">
-                  <div className="max-w-[70%]">
-                    <h2 className="text-3xl font-bold font-headline mb-1 truncate">{currentTrack.title}</h2>
-                    <p className="text-indigo-200/80 truncate">{currentTrack.artist}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    {currentTrack.lrcContent && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={refineSync}
-                        disabled={isProcessing}
-                        className="bg-white/10 border-white/20 hover:bg-white/20 text-white gap-2 rounded-full shrink-0"
+        <Card className="lg:col-span-6 h-[650px] relative overflow-hidden border-none shadow-2xl bg-slate-900 text-white rounded-3xl">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-transparent to-teal-900/40 pointer-events-none" />
+          
+          {currentTrack ? (
+            <div className="relative h-full flex flex-col p-8">
+              <div className="flex-1 overflow-hidden relative">
+                <div 
+                  ref={lyricScrollRef}
+                  className="h-full space-y-8 overflow-y-auto no-scrollbar pt-[30%] pb-[30%]"
+                >
+                  {currentTrack.parsedLrc && currentTrack.parsedLrc.length > 0 ? (
+                    currentTrack.parsedLrc.map((line, i) => (
+                      <div 
+                        key={i} 
+                        className={`text-3xl md:text-5xl font-bold transition-all duration-300 transform ${i === activeLyricIndex ? 'text-secondary scale-105 origin-left opacity-100 drop-shadow-[0_0_15px_rgba(var(--secondary),0.4)]' : 'text-white/10 opacity-100'}`}
                       >
-                        <Sparkles className="w-3.5 h-3.5" /> 
-                        {isProcessing ? "AI Refining..." : "Fix Sync with AI"}
-                      </Button>
-                    )}
-                    {syncOffset !== 0 && (
-                      <Badge variant="secondary" className="bg-orange-500/20 text-orange-200 border-none">
-                        Offset: {syncOffset > 0 ? '+' : ''}{syncOffset.toFixed(1)}s
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-hidden relative">
-                  <div 
-                    ref={lyricScrollRef}
-                    className="h-full space-y-6 overflow-y-auto no-scrollbar pt-[20%] pb-[20%]"
-                  >
-                    {currentTrack.parsedLrc && currentTrack.parsedLrc.length > 0 ? (
-                      currentTrack.parsedLrc.map((line, i) => (
-                        <div 
-                          key={i} 
-                          className={`text-2xl md:text-4xl font-bold transition-all duration-300 transform ${i === activeLyricIndex ? 'text-secondary scale-105 origin-left opacity-100 drop-shadow-sm' : 'text-white/20 hover:text-white/40 opacity-100'}`}
-                        >
-                          {line.text}
+                        {line.text}
+                      </div>
+                    ))
+                  ) : currentTrack.lyricsText ? (
+                    <div className="text-center space-y-4 pt-10">
+                      {currentTrack.lyricsText.split('\n').map((line, i) => (
+                        <div key={i} className="text-xl md:text-2xl font-medium text-white/40">
+                          {line}
                         </div>
-                      ))
-                    ) : currentTrack.lyricsText ? (
-                      <div className="text-center space-y-4 pt-10">
-                        <div className="inline-flex items-center gap-2 bg-yellow-500/20 text-yellow-200 px-3 py-1 rounded-full text-xs mb-4">
-                          <Sparkles className="w-3 h-3 animate-pulse" /> AI Synchronization pending...
-                        </div>
-                        {currentTrack.lyricsText.split('\n').map((line, i) => (
-                          <div key={i} className="text-xl md:text-2xl font-medium text-white/60">
-                            {line}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-                        <FileText className="w-16 h-16 mb-4" />
-                        <p className="text-xl max-w-sm">No lyrics found for this track.</p>
-                      </div>
-                    )}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                      <FileText className="w-16 h-16 mb-4" />
+                      <p className="text-xl max-w-sm">No lyrics found.</p>
+                    </div>
+                  )}
+                </div>
+                <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-slate-900 to-transparent pointer-events-none" />
+                <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-center p-12 space-y-6 opacity-60">
+              <div className="w-24 h-24 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                <Music className="w-12 h-12 text-indigo-400" />
+              </div>
+              <h3 className="text-2xl font-bold font-headline">Select a track to start</h3>
+            </div>
+          )}
+        </Card>
+
+        {/* Controls Sidebar Panel */}
+        <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md">
+          <div className="p-4 border-b bg-muted/30">
+            <h2 className="font-semibold flex items-center gap-2">
+              <Info className="w-4 h-4 text-primary" /> Now Playing
+            </h2>
+          </div>
+          
+          <ScrollArea className="flex-1 p-6">
+            <div className="space-y-8">
+              {currentTrack ? (
+                <>
+                  <div>
+                    <h2 className="text-xl font-bold font-headline mb-1 line-clamp-2">{currentTrack.title}</h2>
+                    <p className="text-sm text-muted-foreground uppercase tracking-wider font-bold">{currentTrack.artist}</p>
                   </div>
-                  <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-slate-900 to-transparent pointer-events-none" />
-                  <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-slate-900 to-transparent pointer-events-none" />
-                </div>
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center p-12 space-y-6 opacity-60">
-                <div className="w-24 h-24 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                  <Play className="w-12 h-12 text-indigo-400 fill-indigo-400" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold mb-2 font-headline">LyricSync Player</h3>
-                  <p className="max-w-xs text-indigo-200/70">Upload a song to experience multimodal AI lyric synchronization.</p>
-                </div>
-              </div>
-            )}
-          </Card>
 
-          {/* Controls Bar */}
-          <Card className="p-6 border-none shadow-lg bg-card/80 backdrop-blur-md rounded-2xl">
-            <div className="space-y-6">
-              <div className="flex items-center gap-4">
-                <span className="text-xs font-mono text-muted-foreground w-12 text-right">{formatTime(currentTime)}</span>
-                <Slider 
-                  value={[currentTime]} 
-                  max={duration || 100} 
-                  step={0.1}
-                  onValueChange={handleSeek}
-                  className="flex-1 cursor-pointer"
-                />
-                <span className="text-xs font-mono text-muted-foreground w-12">{formatTime(duration)}</span>
-              </div>
+                  <Separator />
 
-              <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-                <div className="flex items-center gap-4">
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="hover:text-primary h-10 w-10" 
-                    onClick={() => skipTrack('prev')}
-                  >
-                    <SkipBack className="w-6 h-6" />
-                  </Button>
-                  <Button 
-                    size="icon" 
-                    className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90 shadow-xl shadow-primary/30 transition-all hover:scale-105 active:scale-95"
-                    onClick={togglePlay}
-                  >
-                    {isPlaying ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current ml-1" />}
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="hover:text-primary h-10 w-10" 
-                    onClick={() => skipTrack('next')}
-                  >
-                    <SkipForward className="w-6 h-6" />
-                  </Button>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-8 w-full lg:w-auto">
-                  {/* Manual Sync Offset Adjustment */}
-                  <div className="flex items-center gap-3 w-full sm:w-48">
-                    <Timer className="w-4 h-4 text-orange-500 shrink-0" />
-                    <div className="flex-1 space-y-1">
-                      <div className="flex justify-between text-[10px] text-muted-foreground uppercase tracking-wider font-bold">
-                        <span>Sync Offset</span>
-                        <span>{syncOffset.toFixed(1)}s</span>
-                      </div>
-                      <Slider 
-                        value={[syncOffset]} 
-                        min={-2}
-                        max={2}
-                        step={0.1}
-                        onValueChange={(v) => setSyncOffset(v[0])}
-                        className="flex-1"
-                      />
+                  {/* Playback Progress */}
+                  <div className="space-y-3">
+                    <Slider 
+                      value={[currentTime]} 
+                      max={duration || 100} 
+                      step={0.1}
+                      onValueChange={handleSeek}
+                      className="cursor-pointer"
+                    />
+                    <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
+                      <span>{formatTime(currentTime)}</span>
+                      <span>{formatTime(duration)}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 w-full sm:w-40">
-                    <Volume2 className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <Slider 
-                      value={[volume * 100]} 
-                      max={100} 
-                      onValueChange={(v) => setVolume(v[0] / 100)}
-                      className="flex-1"
-                    />
+                  {/* Playback Controls */}
+                  <div className="flex items-center justify-center gap-6">
+                    <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => skipTrack('prev')}>
+                      <SkipBack className="w-6 h-6" />
+                    </Button>
+                    <Button 
+                      size="icon" 
+                      className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90 shadow-xl shadow-primary/30"
+                      onClick={togglePlay}
+                    >
+                      {isPlaying ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current ml-1" />}
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-10 w-10" onClick={() => skipTrack('next')}>
+                      <SkipForward className="w-6 h-6" />
+                    </Button>
                   </div>
+
+                  <Separator />
+
+                  {/* Volume & Sync Controls */}
+                  <div className="space-y-6">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground font-bold uppercase">
+                        <div className="flex items-center gap-2">
+                          <Volume2 className="w-3 h-3" /> Volume
+                        </div>
+                        <span>{Math.round(volume * 100)}%</span>
+                      </div>
+                      <Slider value={[volume * 100]} max={100} onValueChange={(v) => setVolume(v[0] / 100)} />
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground font-bold uppercase">
+                        <div className="flex items-center gap-2">
+                          <Timer className="w-3 h-3" /> Sync Offset
+                        </div>
+                        <Badge variant="secondary" className="px-1.5 h-4 text-[9px] bg-orange-500/10 text-orange-600 border-none">
+                          {syncOffset > 0 ? '+' : ''}{syncOffset.toFixed(1)}s
+                        </Badge>
+                      </div>
+                      <Slider value={[syncOffset]} min={-2} max={2} step={0.1} onValueChange={(v) => setSyncOffset(v[0])} />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-3">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold">AI Tools</p>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start gap-2 h-9 text-xs" 
+                      onClick={refineSync}
+                      disabled={isProcessing || !currentTrack.lrcContent}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-orange-500" /> 
+                      {isProcessing ? "Refining..." : "Fine-tune with AI"}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="py-20 text-center opacity-30">
+                  <Play className="w-12 h-12 mx-auto mb-4" />
+                  <p className="text-xs uppercase font-bold tracking-widest">No Active Track</p>
                 </div>
-              </div>
+              )}
             </div>
-          </Card>
-        </div>
+          </ScrollArea>
+        </Card>
       </main>
 
       <audio 
@@ -578,3 +569,4 @@ export default function LyricSyncApp() {
     </div>
   );
 }
+
