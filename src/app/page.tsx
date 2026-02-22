@@ -13,7 +13,8 @@ import {
   Sparkles, 
   Trash2,
   ListMusic,
-  CheckCircle2
+  CheckCircle2,
+  FileCode
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -60,6 +61,7 @@ export default function LyricSyncApp() {
   const [newTitle, setNewTitle] = useState("");
   const [newArtist, setNewArtist] = useState("");
   const [newMp3File, setNewMp3File] = useState<File | null>(null);
+  const [newLyricsFile, setNewLyricsFile] = useState<File | null>(null);
   const [newLyricsText, setNewLyricsText] = useState("");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -119,6 +121,24 @@ export default function LyricSyncApp() {
     setCurrentTrackIndex(nextIndex);
   };
 
+  const readFileAsDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const readFileAsText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  };
+
   const handleFileUpload = async () => {
     if (!newMp3File || !newTitle) {
       toast({ title: "Error", description: "Title and MP3 file are required.", variant: "destructive" });
@@ -127,56 +147,68 @@ export default function LyricSyncApp() {
 
     setIsProcessing(true);
     try {
-      const reader = new FileReader();
-      reader.readAsDataURL(newMp3File);
+      const mp3DataUri = await readFileAsDataURL(newMp3File);
       
-      reader.onload = async () => {
-        const mp3DataUri = reader.result as string;
-        let lrcContent = "";
-        let parsedLrc: LrcLine[] = [];
+      let lyricsToProcess = newLyricsText;
+      let lrcContent = "";
+      let parsedLrc: LrcLine[] = [];
+      let isLrcFile = false;
 
-        if (newLyricsText) {
-          try {
-            const aiRes = await generateLrcFromMp3AndLyrics({
-              mp3DataUri,
-              lyricsText: newLyricsText,
-              songTitle: newTitle,
-              artist: newArtist
-            });
-            lrcContent = aiRes.lrcContent;
-            parsedLrc = parseLrc(lrcContent);
-            toast({ title: "Success", description: "AI generated synchronized lyrics!" });
-          } catch (err) {
-            console.error(err);
-            toast({ title: "AI Error", description: "Failed to generate AI lyrics. Using text only.", variant: "destructive" });
-          }
+      // Handle lyric file if provided
+      if (newLyricsFile) {
+        const fileContent = await readFileAsText(newLyricsFile);
+        if (newLyricsFile.name.toLowerCase().endsWith('.lrc')) {
+          lrcContent = fileContent;
+          parsedLrc = parseLrc(lrcContent);
+          isLrcFile = true;
+        } else {
+          lyricsToProcess = fileContent;
         }
+      }
 
-        const newTrack: Track = {
-          id: Date.now().toString(),
-          title: newTitle,
-          artist: newArtist || "Unknown Artist",
-          mp3DataUri,
-          lyricsText: newLyricsText,
-          lrcContent,
-          parsedLrc
-        };
+      // If we have plain text lyrics and no synchronization data yet, run AI
+      if (lyricsToProcess && !isLrcFile) {
+        try {
+          const aiRes = await generateLrcFromMp3AndLyrics({
+            mp3DataUri,
+            lyricsText: lyricsToProcess,
+            songTitle: newTitle,
+            artist: newArtist
+          });
+          lrcContent = aiRes.lrcContent;
+          parsedLrc = parseLrc(lrcContent);
+          toast({ title: "Success", description: "AI generated synchronized lyrics!" });
+        } catch (err) {
+          console.error(err);
+          toast({ title: "AI Error", description: "Failed to sync with AI. Using plain text.", variant: "destructive" });
+        }
+      }
 
-        setPlaylist(prev => [...prev, newTrack]);
-        if (currentTrackIndex === -1) setCurrentTrackIndex(0);
-        
-        // Reset form
-        setNewTitle("");
-        setNewArtist("");
-        setNewMp3File(null);
-        setNewLyricsText("");
-        setIsUploadOpen(false);
-        setIsProcessing(false);
+      const newTrack: Track = {
+        id: Date.now().toString(),
+        title: newTitle,
+        artist: newArtist || "Unknown Artist",
+        mp3DataUri,
+        lyricsText: lyricsToProcess || (isLrcFile ? lrcContent.replace(/\[.*?\]/g, '') : ""),
+        lrcContent,
+        parsedLrc
       };
+
+      setPlaylist(prev => [...prev, newTrack]);
+      if (currentTrackIndex === -1) setCurrentTrackIndex(0);
+      
+      // Reset form
+      setNewTitle("");
+      setNewArtist("");
+      setNewMp3File(null);
+      setNewLyricsFile(null);
+      setNewLyricsText("");
+      setIsUploadOpen(false);
     } catch (error) {
       console.error(error);
-      setIsProcessing(false);
       toast({ title: "Upload Failed", description: "An error occurred during file processing.", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -236,16 +268,16 @@ export default function LyricSyncApp() {
               <Upload className="w-4 h-4" /> Upload Song
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Upload New Track</DialogTitle>
               <DialogDescription>
-                Add an MP3 and optional lyrics text. Our AI will automatically sync them!
+                Add an MP3 and lyrics (.txt or .lrc). Our AI will sync plain text automatically!
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="title">Song Title</Label>
+                <Label htmlFor="title">Song Title *</Label>
                 <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Bohemian Rhapsody" />
               </div>
               <div className="grid gap-2">
@@ -253,7 +285,7 @@ export default function LyricSyncApp() {
                 <Input id="artist" value={newArtist} onChange={e => setNewArtist(e.target.value)} placeholder="e.g. Queen" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="mp3">MP3 File</Label>
+                <Label htmlFor="mp3">MP3 File *</Label>
                 <Input 
                   id="mp3" 
                   type="file" 
@@ -262,10 +294,19 @@ export default function LyricSyncApp() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="lyrics">Lyrics (Optional .txt or copy-paste)</Label>
+                <Label htmlFor="lyricFile">Lyric File (.txt, .lrc)</Label>
+                <Input 
+                  id="lyricFile" 
+                  type="file" 
+                  accept=".txt,.lrc" 
+                  onChange={e => setNewLyricsFile(e.target.files ? e.target.files[0] : null)} 
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="lyrics">Or Paste Lyrics</Label>
                 <textarea 
                   id="lyrics" 
-                  className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   value={newLyricsText}
                   onChange={e => setNewLyricsText(e.target.value)}
                   placeholder="Paste lyrics here..."
@@ -278,7 +319,7 @@ export default function LyricSyncApp() {
                 disabled={isProcessing || !newMp3File || !newTitle}
                 className="w-full"
               >
-                {isProcessing ? "Processing with AI..." : "Start Syncing"}
+                {isProcessing ? "Processing..." : "Start Syncing"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -325,7 +366,7 @@ export default function LyricSyncApp() {
                     <p className="font-medium truncate leading-none mb-1">{track.title}</p>
                     <p className="text-xs text-muted-foreground truncate">{track.artist}</p>
                   </div>
-                  {track.lrcContent && <CheckCircle2 className="w-4 h-4 text-secondary shrink-0" />}
+                  {track.parsedLrc && track.parsedLrc.length > 0 && <CheckCircle2 className="w-4 h-4 text-secondary shrink-0" />}
                   <Button 
                     variant="ghost" 
                     size="icon" 
@@ -359,9 +400,9 @@ export default function LyricSyncApp() {
             {currentTrack ? (
               <div className="relative h-full flex flex-col p-8">
                 <div className="flex justify-between items-start mb-8">
-                  <div>
-                    <h2 className="text-3xl font-bold font-headline mb-1">{currentTrack.title}</h2>
-                    <p className="text-indigo-200/80">{currentTrack.artist}</p>
+                  <div className="max-w-[70%]">
+                    <h2 className="text-3xl font-bold font-headline mb-1 truncate">{currentTrack.title}</h2>
+                    <p className="text-indigo-200/80 truncate">{currentTrack.artist}</p>
                   </div>
                   {currentTrack.lrcContent && (
                     <Button 
@@ -369,7 +410,7 @@ export default function LyricSyncApp() {
                       size="sm" 
                       onClick={refineSync}
                       disabled={isProcessing}
-                      className="bg-white/10 border-white/20 hover:bg-white/20 text-white gap-2 rounded-full"
+                      className="bg-white/10 border-white/20 hover:bg-white/20 text-white gap-2 rounded-full shrink-0"
                     >
                       <Sparkles className="w-3.5 h-3.5" /> 
                       {isProcessing ? "Refining..." : "Refine Sync"}
@@ -382,12 +423,7 @@ export default function LyricSyncApp() {
                     ref={lyricScrollRef}
                     className="h-full space-y-6 overflow-y-auto no-scrollbar pt-[20%] pb-[20%]"
                   >
-                    {!currentTrack.parsedLrc?.length ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
-                        <FileText className="w-16 h-16 mb-4" />
-                        <p className="text-xl max-w-sm">No synchronized lyrics available for this track.</p>
-                      </div>
-                    ) : (
+                    {currentTrack.parsedLrc && currentTrack.parsedLrc.length > 0 ? (
                       currentTrack.parsedLrc.map((line, i) => (
                         <div 
                           key={i} 
@@ -396,6 +432,22 @@ export default function LyricSyncApp() {
                           {line.text}
                         </div>
                       ))
+                    ) : currentTrack.lyricsText ? (
+                      <div className="text-center space-y-4 pt-10">
+                        <div className="inline-flex items-center gap-2 bg-yellow-500/20 text-yellow-200 px-3 py-1 rounded-full text-xs mb-4">
+                          <Sparkles className="w-3 h-3" /> Synchronization pending...
+                        </div>
+                        {currentTrack.lyricsText.split('\n').map((line, i) => (
+                          <div key={i} className="text-xl md:text-2xl font-medium text-white/60">
+                            {line}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                        <FileText className="w-16 h-16 mb-4" />
+                        <p className="text-xl max-w-sm">No lyrics found for this track.</p>
+                      </div>
                     )}
                   </div>
                   {/* Fade effects for top and bottom */}
@@ -420,7 +472,7 @@ export default function LyricSyncApp() {
           <Card className="p-6 border-none shadow-lg bg-card/80 backdrop-blur-md rounded-2xl">
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <span className="text-xs font-mono text-muted-foreground w-10">{formatTime(currentTime)}</span>
+                <span className="text-xs font-mono text-muted-foreground w-10 text-right">{formatTime(currentTime)}</span>
                 <Slider 
                   value={[currentTime]} 
                   max={duration || 100} 
