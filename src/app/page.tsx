@@ -16,7 +16,6 @@ import {
   Palette,
   Maximize,
   Minimize,
-  Repeat,
   Zap,
   FileText,
   Layout
@@ -70,7 +69,7 @@ interface Track extends Omit<TrackData, 'mp3Blob'> {
 }
 
 export default function LyricSyncApp() {
-  // --- Hooks must be called unconditionally at the top ---
+  // --- All Hooks must be at the top ---
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -84,11 +83,10 @@ export default function LyricSyncApp() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isIframe, setIsIframe] = useState(false);
   const [isAppLaunched, setIsAppLaunched] = useState(false);
-  
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
 
-  // Settings with persistence
+  // Settings
   const [fontSize, setFontSize] = useState<string>("md");
   const [activeColor, setActiveColor] = useState<string>("secondary");
   const [bgTheme, setBgTheme] = useState<string>("slate-900");
@@ -100,18 +98,17 @@ export default function LyricSyncApp() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lyricScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Load settings from localStorage
+  // Load settings
   useEffect(() => {
     const savedFontSize = localStorage.getItem('lyricSync_fontSize');
     const savedActiveColor = localStorage.getItem('lyricSync_activeColor');
     const savedBgTheme = localStorage.getItem('lyricSync_bgTheme');
-    
     if (savedFontSize) setFontSize(savedFontSize);
     if (savedActiveColor) setActiveColor(savedActiveColor);
     if (savedBgTheme) setBgTheme(savedBgTheme);
   }, []);
 
-  // Save settings to localStorage
+  // Save settings
   useEffect(() => {
     localStorage.setItem('lyricSync_fontSize', fontSize);
     localStorage.setItem('lyricSync_activeColor', activeColor);
@@ -119,30 +116,23 @@ export default function LyricSyncApp() {
   }, [fontSize, activeColor, bgTheme]);
 
   useEffect(() => {
-    const isInIframe = window.self !== window.top;
-    setIsIframe(isInIframe);
+    setIsIframe(window.self !== window.top);
   }, []);
 
   const requestWakeLock = useCallback(async () => {
     if (!('wakeLock' in navigator)) return;
     try {
-      if (wakeLock) {
-        await wakeLock.release();
-        setWakeLock(null);
-      }
+      if (wakeLock) await wakeLock.release();
       const lock = await (navigator as any).wakeLock.request('screen');
       setWakeLock(lock);
-      lock.addEventListener('release', () => setWakeLock(null));
     } catch (err: any) {
-      setWakeLock(null);
+      console.warn("Wake lock failed:", err.name);
     }
   }, [wakeLock]);
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && isPlaying) {
-        await requestWakeLock();
-      }
+      if (document.visibilityState === 'visible' && isPlaying) await requestWakeLock();
     };
     if (isPlaying) {
       requestWakeLock();
@@ -154,10 +144,7 @@ export default function LyricSyncApp() {
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     }
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (wakeLock) wakeLock.release().catch(() => {});
-    };
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isPlaying, requestWakeLock, wakeLock]);
 
   useEffect(() => {
@@ -186,7 +173,7 @@ export default function LyricSyncApp() {
         }));
         setPlaylist(tracksWithUrls);
       } catch (error) {
-        console.warn("Failed to load tracks", error);
+        console.warn("Failed to load tracks");
       } finally {
         setIsLoadingDB(false);
       }
@@ -203,39 +190,32 @@ export default function LyricSyncApp() {
   const activeLyricIndex = currentTrack?.parsedLrc?.findLastIndex(l => l.time <= adjustedCurrentTime) ?? -1;
 
   useEffect(() => {
-    if (lyricScrollRef.current) {
-      if (activeLyricIndex !== -1) {
-        const activeEl = lyricScrollRef.current.children[activeLyricIndex] as HTMLElement;
-        if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else if (currentTime === 0) {
-        lyricScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+    if (lyricScrollRef.current && activeLyricIndex !== -1) {
+      const activeEl = lyricScrollRef.current.children[activeLyricIndex] as HTMLElement;
+      if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
-  }, [activeLyricIndex, currentTime]);
+  }, [activeLyricIndex]);
 
+  // Handle early return for iframe after all hooks are declared
   if (isIframe && !isAppLaunched) {
     return (
-      <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
-        <div className="w-24 h-24 bg-primary rounded-3xl flex items-center justify-center text-primary-foreground shadow-2xl shadow-primary/40 mb-8 animate-bounce">
-          <Music className="w-12 h-12" />
+      <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center text-primary-foreground shadow-2xl mb-6 animate-bounce">
+          <Music className="w-10 h-10" />
         </div>
-        <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">LyricSync</h1>
-        <p className="text-slate-400 max-w-md mb-12 text-lg leading-relaxed">
-          偵測到您正在預覽環境中。為了支援<strong>「螢幕常亮」</strong>與<strong>「全螢幕」</strong>，請點擊下方按鈕在獨立網頁中開啟。
+        <h1 className="text-3xl font-bold text-white mb-2">LyricSync</h1>
+        <p className="text-slate-400 max-w-xs mb-10 text-sm">
+          偵測到您正在預覽環境中。請開啟獨立網頁以獲得<strong>螢幕常亮</strong>與<strong>全螢幕</strong>權限。
         </p>
-        <Button 
-          size="lg" 
-          onClick={() => { window.open(window.location.href, '_blank'); setIsAppLaunched(true); }}
-          className="h-16 px-12 text-xl font-bold gap-3 rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-transform"
-        >
-          <Zap className="w-6 h-6 fill-current" />
+        <Button size="lg" onClick={() => { window.open(window.location.href, '_blank'); setIsAppLaunched(true); }} className="h-14 px-10 text-lg font-bold gap-2 rounded-xl">
+          <Zap className="w-5 h-5 fill-current" />
           立即啟動 App
         </Button>
       </div>
     );
   }
 
-  // --- UI Helper functions ---
+  // UI Helpers
   const getFontSizeClass = () => {
     switch (fontSize) {
       case 'sm': return 'text-xl md:text-2xl';
@@ -288,9 +268,7 @@ export default function LyricSyncApp() {
 
   const toggleFullscreen = (force?: boolean) => {
     if (force === true || !document.fullscreenElement) {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {});
-      }
+      if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {});
     } else if (force === false || document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
@@ -305,7 +283,6 @@ export default function LyricSyncApp() {
     try {
       await audioRef.current.play();
       requestWakeLock();
-      toggleFullscreen(true);
     } catch (error) {
       console.warn("Playback failed:", error);
     }
@@ -317,10 +294,7 @@ export default function LyricSyncApp() {
       return;
     }
     if (audioRef.current.paused) {
-      audioRef.current.play().then(() => {
-        requestWakeLock();
-        toggleFullscreen(true);
-      }).catch(() => {});
+      audioRef.current.play().then(() => requestWakeLock()).catch(() => {});
     } else {
       audioRef.current.pause();
     }
@@ -338,10 +312,7 @@ export default function LyricSyncApp() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      setNewLyricsText(text);
-    };
+    reader.onload = (event) => setNewLyricsText(event.target?.result as string);
     reader.readAsText(file);
   };
 
@@ -360,36 +331,17 @@ export default function LyricSyncApp() {
       const finalTitle = newTitle || newMp3File.name.replace(/\.[^/.]+$/, "");
       const finalArtist = "未知歌手";
       let lrcContent = "";
-      let parsedLrc: LrcLine[] = [];
 
       if (!newLyricsText) {
-        toast({ title: "AI 聽寫中", description: "偵測到無歌詞輸入，正在由 AI 自動從歌曲中聽寫歌詞並同步..." });
-        const aiRes = await transcribeMp3ToLrc({
-          mp3DataUri,
-          songTitle: finalTitle,
-          artist: finalArtist
-        });
+        toast({ title: "AI 聽寫中", description: "正在自動從歌曲中聽寫歌詞並同步..." });
+        const aiRes = await transcribeMp3ToLrc({ mp3DataUri, songTitle: finalTitle, artist: finalArtist });
         lrcContent = aiRes.lrcContent;
-        toast({ title: "聽寫完成", description: "AI 已完成自動聽寫與同步！" });
       } else {
-        try {
-          toast({ title: "同步中", description: "AI 正在分析音訊以對齊歌詞時間..." });
-          const aiRes = await generateLrcFromMp3AndLyrics({
-            mp3DataUri,
-            lyricsText: newLyricsText,
-            songTitle: finalTitle,
-            artist: finalArtist
-          });
-          lrcContent = aiRes.lrcContent;
-          toast({ title: "同步成功", description: "AI 已完成歌詞同步！" });
-        } catch (err) {
-          lrcContent = "";
-          toast({ title: "同步失敗", description: "AI 同步發生錯誤，將使用純文字模式。", variant: "destructive" });
-        }
+        toast({ title: "同步中", description: "AI 正在分析對齊歌詞時間..." });
+        const aiRes = await generateLrcFromMp3AndLyrics({ mp3DataUri, lyricsText: newLyricsText, songTitle: finalTitle, artist: finalArtist });
+        lrcContent = aiRes.lrcContent;
       }
 
-      parsedLrc = lrcContent ? parseLrc(lrcContent) : [];
-      
       const trackId = Date.now().toString();
       const trackData: TrackData = {
         id: trackId, title: finalTitle, artist: finalArtist,
@@ -398,261 +350,191 @@ export default function LyricSyncApp() {
       };
       await saveTrackToDB(trackData);
       const audioUrl = URL.createObjectURL(newMp3File);
-      const newTrack: Track = { ...trackData, audioUrl, mp3DataUri, parsedLrc };
-      const newPlaylist = [...playlist, newTrack];
-      setPlaylist(newPlaylist);
-      if (currentTrackIndex === -1) playTrack(newPlaylist.length - 1);
+      const newTrack: Track = { ...trackData, audioUrl, mp3DataUri, parsedLrc: lrcContent ? parseLrc(lrcContent) : [] };
+      setPlaylist(prev => [...prev, newTrack]);
+      if (currentTrackIndex === -1) playTrack(playlist.length);
       setNewTitle(""); setNewMp3File(null); setNewLyricsText(""); setIsUploadOpen(false);
+      toast({ title: "完成", description: "歌曲處理成功！" });
     } catch (error) {
-      toast({ title: "上傳失敗", description: "處理檔案時發生錯誤。", variant: "destructive" });
+      toast({ title: "失敗", description: "處理檔案時發生錯誤。", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center p-0">
-      <header className="w-full max-w-7xl flex justify-between items-center py-1.5 px-4 z-10 bg-background/80 backdrop-blur-sm sticky top-0">
+    <div className="min-h-screen bg-background flex flex-col p-0 overflow-hidden">
+      {/* Mini Header */}
+      <header className="flex justify-between items-center py-1 px-4 z-10 bg-background/80 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-2">
-          <div className="bg-primary p-1 rounded-lg text-primary-foreground">
-            <Music className="w-3.5 h-3.5" />
-          </div>
+          <Music className="w-4 h-4 text-primary" />
           <h1 className="text-sm font-bold tracking-tight text-primary">LyricSync</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => toggleFullscreen()} className="h-7 gap-1 px-2 text-xs">
-            {isFullscreen ? <Minimize className="w-3 h-3" /> : <Maximize className="w-3 h-3" />}
-            <span className="hidden sm:inline">{isFullscreen ? "退出" : "全螢幕"}</span>
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" onClick={() => toggleFullscreen()} className="h-7 gap-1 px-2 text-xs">
+          {isFullscreen ? <Minimize className="w-3 h-3" /> : <Maximize className="w-3 h-3" />}
+          <span className="hidden sm:inline">{isFullscreen ? "退出" : "全螢幕"}</span>
+        </Button>
       </header>
 
-      <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-1.5 flex-1 items-stretch p-1.5 pt-0">
-        {/* Playlist Card */}
-        <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-lg bg-card/50 backdrop-blur order-2 lg:order-1">
-          <div className="p-3 border-b flex flex-col gap-2.5 bg-muted/30">
+      {/* Main Grid Layout */}
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-1 px-1 pb-1 overflow-hidden">
+        
+        {/* Playlist Card - Mobile Bottom / Desktop Left */}
+        <Card className="lg:col-span-3 flex flex-col overflow-hidden border-none shadow-lg bg-card/50 backdrop-blur order-2 lg:order-1 h-[250px] lg:h-full">
+          <div className="p-2 border-b flex flex-col gap-1.5 bg-muted/30 shrink-0">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold flex items-center gap-2">
+              <h2 className="text-[10px] font-bold flex items-center gap-1">
                 <ListMusic className="w-3 h-3 text-primary" /> 播放清單
               </h2>
-              <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-tighter">
-                {isLoadingDB ? "載入中..." : `${playlist.length} 首歌曲`}
+              <span className="text-[8px] text-muted-foreground font-bold uppercase">
+                {isLoadingDB ? "載入中..." : `${playlist.length} SONGS`}
               </span>
             </div>
-
-            <div className="flex gap-1.5">
-              <Button onClick={togglePlay} className={cn("flex-1 gap-2 h-9 shadow-md text-xs font-bold", isPlaying ? "bg-orange-600 hover:bg-orange-700" : "bg-primary hover:bg-primary/90")}>
-                {isPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                {isPlaying ? "停止播放" : "開始播放"}
+            <div className="flex gap-1">
+              <Button onClick={togglePlay} size="sm" className="flex-1 gap-1.5 h-8 text-[10px] font-bold shadow-sm">
+                {isPlaying ? <Pause className="w-3 h-3 fill-current" /> : <Play className="w-3 h-3 fill-current" />}
+                {isPlaying ? "暫停" : "播放"}
               </Button>
-              
               <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="secondary" size="icon" className="h-9 w-9 shadow-md shrink-0">
-                    <Upload className="w-3.5 h-3.5" />
-                  </Button>
+                  <Button variant="secondary" size="icon" className="h-8 w-8 shadow-sm"><Upload className="w-3.5 h-3.5" /></Button>
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[450px]">
+                <DialogContent className="sm:max-w-[400px]">
                   <DialogHeader>
                     <DialogTitle>新增歌曲</DialogTitle>
-                    <DialogDescription>
-                      請選擇 MP3。歌詞為選填，若留空將由 AI 自動聽寫。
-                    </DialogDescription>
+                    <DialogDescription>請選擇 MP3 檔案。若留空歌詞，AI 將自動聽寫。</DialogDescription>
                   </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="mp3" className="text-xs font-bold">1. 音訊檔案 (MP3) *</Label>
-                      <Input id="mp3" type="file" accept="audio/mpeg" onChange={e => setNewMp3File(e.target.files ? e.target.files[0] : null)} />
+                  <div className="grid gap-3 py-3">
+                    <div className="grid gap-1">
+                      <Label className="text-[10px] font-bold uppercase">1. 音訊檔案 (MP3) *</Label>
+                      <Input type="file" accept="audio/mpeg" onChange={e => setNewMp3File(e.target.files ? e.target.files[0] : null)} />
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="title" className="text-xs font-bold">2. 歌曲名稱 (選填)</Label>
-                      <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="自動識別檔名..." />
+                    <div className="grid gap-1">
+                      <Label className="text-[10px] font-bold uppercase">2. 歌曲名稱 (選填)</Label>
+                      <Input value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="留空則使用檔名" />
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="lyrics-file" className="text-xs font-bold flex items-center gap-2">
-                        <FileText className="w-3 h-3" /> 3. 歌詞來源 (選填)
+                    <div className="grid gap-1">
+                      <Label className="text-[10px] font-bold uppercase flex items-center gap-1.5">
+                        <FileText className="w-3 h-3" /> 3. 歌詞 (.txt 選填)
                       </Label>
-                      <div className="flex gap-2 mb-1">
-                        <Input id="lyrics-file" type="file" accept=".txt" onChange={handleLyricsFileChange} className="text-[10px] h-7 px-2" />
-                      </div>
-                      <textarea 
-                        id="lyrics" 
-                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        value={newLyricsText}
-                        onChange={e => setNewLyricsText(e.target.value)}
-                        placeholder="手動貼上歌詞... 或留空由 AI 自動聽寫"
-                      />
+                      <Input type="file" accept=".txt" onChange={handleLyricsFileChange} className="h-8 text-[10px] mb-1" />
+                      <textarea className="flex min-h-[100px] w-full rounded-md border bg-background px-3 py-2 text-xs" value={newLyricsText} onChange={e => setNewLyricsText(e.target.value)} placeholder="或在此貼上文字..." />
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button onClick={handleFileUpload} disabled={isProcessing || !newMp3File} className="w-full">
-                      {isProcessing ? "AI 處理中..." : (newLyricsText ? "開始 AI 同步" : "開始 AI 聽寫同步")}
+                    <Button onClick={handleFileUpload} disabled={isProcessing || !newMp3File} className="w-full h-10 font-bold">
+                      {isProcessing ? "AI 處理中..." : (newLyricsText ? "開始同步" : "開始 AI 聽寫")}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
             </div>
           </div>
-          <ScrollArea className="flex-1 min-h-[150px]">
+          <ScrollArea className="flex-1 overflow-y-auto">
             {playlist.length === 0 && !isLoadingDB ? (
-              <div className="p-8 text-center text-muted-foreground opacity-30">
-                <Music className="w-8 h-8 mx-auto mb-2" />
-                <p className="text-[10px]">尚未新增歌曲</p>
-              </div>
+              <div className="p-10 text-center opacity-20"><Music className="w-6 h-6 mx-auto" /></div>
             ) : (
               playlist.map((track, index) => (
-                <div key={track.id} onClick={() => playTrack(index)} className={`group p-3 flex items-center gap-3 cursor-pointer border-b last:border-0 transition-colors ${index === currentTrackIndex ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-muted/50'}`}>
-                  <div className="relative w-6 h-6 bg-primary/20 rounded-md flex items-center justify-center text-primary shrink-0">
-                    {index === currentTrackIndex && isPlaying ? (
-                      <div className="flex gap-0.5 items-end h-2">
-                        <div className="w-0.5 bg-primary animate-bounce h-full"></div>
-                        <div className="w-0.5 bg-primary animate-bounce delay-150 h-2/3"></div>
-                      </div>
-                    ) : <Music className="w-3 h-3" />}
+                <div key={track.id} onClick={() => playTrack(index)} className={cn("group p-2.5 flex items-center gap-2 cursor-pointer border-b transition-colors", index === currentTrackIndex ? 'bg-primary/10 border-l-2 border-l-primary' : 'hover:bg-muted/50')}>
+                  <div className="w-5 h-5 bg-primary/20 rounded flex items-center justify-center shrink-0">
+                    {index === currentTrackIndex && isPlaying ? <div className="flex gap-0.5"><div className="w-0.5 bg-primary animate-bounce h-2"></div><div className="w-0.5 bg-primary animate-bounce delay-100 h-2"></div></div> : <Music className="w-2.5 h-2.5 text-primary" />}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium truncate leading-none">{track.title}</p>
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={(e) => { e.stopPropagation(); setTrackToDelete(track.id); }}>
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
+                  <span className="text-[11px] font-medium truncate flex-1">{track.title}</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={(e) => { e.stopPropagation(); setTrackToDelete(track.id); }}><Trash2 className="w-3 h-3" /></Button>
                 </div>
               ))
             )}
           </ScrollArea>
         </Card>
 
-        {/* Lyrics Card - Optimized for mobile top view */}
-        <Card onClick={togglePlay} className={cn("lg:col-span-6 h-[500px] lg:h-full relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-2xl order-1 lg:order-2 cursor-pointer group/lyrics", getBgThemeClass(), "text-white")}>
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20 pointer-events-none" />
+        {/* Lyrics Card - Main Focus */}
+        <Card className={cn("lg:col-span-6 flex flex-col relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-xl order-1 lg:order-2 flex-1", getBgThemeClass())}>
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-black/40 pointer-events-none" />
           {currentTrack ? (
             <div className="relative h-full flex flex-col">
               <div className="flex-1 overflow-hidden relative">
-                <div ref={lyricScrollRef} className="h-full space-y-5 overflow-y-auto no-scrollbar pt-[10%] pb-[40%] px-6 md:px-12">
+                <div ref={lyricScrollRef} className="h-full space-y-4 overflow-y-auto no-scrollbar pt-[15%] pb-[40%] px-6">
                   {currentTrack.parsedLrc && currentTrack.parsedLrc.length > 0 ? (
                     currentTrack.parsedLrc.map((line, i) => (
-                      <div key={i} className={cn(getFontSizeClass(), "font-bold transition-all duration-300 transform break-words whitespace-pre-wrap leading-tight", i === activeLyricIndex ? `${getActiveColorClass()} scale-105 origin-left opacity-100 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]` : 'text-white/20 opacity-100')}>
+                      <div key={i} className={cn(getFontSizeClass(), "font-bold transition-all duration-300 break-words whitespace-pre-wrap leading-tight", i === activeLyricIndex ? `${getActiveColorClass()} scale-105 origin-left opacity-100` : 'text-white/20')}>
                         {line.text}
                       </div>
                     ))
                   ) : (
-                    <div className="text-center space-y-4 pt-10 px-4">
-                      {currentTrack.lyricsText?.split('\n').map((line, i) => (
-                        <div key={i} className="text-lg md:text-xl font-medium text-white/40 break-words whitespace-pre-wrap">{line}</div>
-                      ))}
-                    </div>
+                    <div className="text-center space-y-3 pt-10"><p className="text-lg text-white/30 font-medium">無動態歌詞</p></div>
                   )}
                 </div>
+                {/* Fade overlays for smooth lyrics scrolling */}
                 <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none" style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }} />
-                <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none" style={{ background: `linear-gradient(to top, ${getThemeHex()}, transparent)` }} />
+                <div className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none" style={{ background: `linear-gradient(to top, ${getThemeHex()}, transparent)` }} />
               </div>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center p-12 space-y-6 opacity-30">
-              <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center border border-primary/20">
-                <Music className="w-8 h-8 text-primary" />
-              </div>
-              <p className="text-sm font-bold uppercase tracking-widest">請新增或選擇歌曲</p>
-            </div>
+            <div className="h-full flex flex-col items-center justify-center opacity-20 p-8"><Music className="w-10 h-10 mb-2" /><p className="text-xs uppercase font-bold tracking-widest">請新增或選擇歌曲</p></div>
           )}
         </Card>
 
         {/* Control Panel Card */}
-        <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-lg bg-card/80 backdrop-blur-md order-3">
-          <ScrollArea className="flex-1 p-4">
-            <div className="space-y-5">
+        <Card className="lg:col-span-3 flex flex-col border-none shadow-lg bg-card/80 backdrop-blur-md order-3 h-fit lg:h-full">
+          <ScrollArea className="flex-1 p-3 overflow-y-auto">
+            <div className="space-y-4">
               {currentTrack ? (
                 <>
-                  <div>
-                    <h2 className="text-sm font-bold font-headline mb-0.5 line-clamp-2 leading-tight">{currentTrack.title}</h2>
-                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">AI 同步完成</p>
+                  <div className="space-y-0.5">
+                    <h2 className="text-xs font-bold line-clamp-1">{currentTrack.title}</h2>
+                    <p className="text-[8px] text-muted-foreground font-bold uppercase tracking-widest">Playing Now</p>
                   </div>
                   <Separator />
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <Slider value={[currentTime]} max={duration || 100} step={0.1} onValueChange={(v) => { if (audioRef.current) audioRef.current.currentTime = v[0]; }} className="h-4" />
-                    <div className="flex justify-between text-[9px] font-mono text-muted-foreground">
-                      <span>{formatTime(currentTime)}</span>
-                      <span>{formatTime(duration)}</span>
-                    </div>
+                    <div className="flex justify-between text-[9px] font-mono text-muted-foreground"><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div>
                   </div>
-                  <div className="flex items-center justify-center gap-4">
+                  <div className="flex items-center justify-center gap-4 py-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => skipTrack('prev')}><SkipBack className="w-4 h-4" /></Button>
-                    <Button size="icon" className="h-12 w-12 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20" onClick={togglePlay}>
-                      {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}
+                    <Button size="icon" className="h-10 w-10 rounded-full shadow-md" onClick={togglePlay}>
+                      {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
                     </Button>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => skipTrack('next')}><SkipForward className="w-4 h-4" /></Button>
                   </div>
-                  <Separator />
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-[8px] text-muted-foreground font-bold uppercase">
-                        <div className="flex items-center gap-1"><Volume2 className="w-2.5 h-2.5" /> 音量</div>
-                        <span>{Math.round(volume * 100)}%</span>
-                      </div>
-                      <Slider value={[volume * 100]} max={100} onValueChange={(v) => setVolume(v[0] / 100)} className="h-3.5" />
+                  <div className="space-y-3 pt-2">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[8px] font-bold uppercase opacity-60"><span>音量</span><span>{Math.round(volume * 100)}%</span></div>
+                      <Slider value={[volume * 100]} max={100} onValueChange={(v) => setVolume(v[0] / 100)} className="h-3" />
                     </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-[8px] text-muted-foreground font-bold uppercase">
-                        <div className="flex items-center gap-1"><Timer className="w-2.5 h-2.5" /> 偏移</div>
-                        <span className="text-orange-600">{syncOffset > 0 ? '+' : ''}{syncOffset.toFixed(1)}s</span>
-                      </div>
-                      <Slider value={[syncOffset]} min={-2} max={2} step={0.1} onValueChange={(v) => setSyncOffset(v[0])} className="h-3.5" />
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[8px] font-bold uppercase opacity-60"><span>歌詞偏移</span><span>{syncOffset.toFixed(1)}s</span></div>
+                      <Slider value={[syncOffset]} min={-2} max={2} step={0.1} onValueChange={(v) => setSyncOffset(v[0])} className="h-3" />
                     </div>
                     <Separator />
-                    <div className="space-y-3">
-                      <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-wider opacity-50">介面設定</p>
-                      <div className="grid gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-[9px] flex items-center gap-1.5 uppercase opacity-60"><Type className="w-2.5 h-2.5" /> 字體大小</Label>
-                          <Select value={fontSize} onValueChange={setFontSize}>
-                            <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="sm">標準 (S)</SelectItem>
-                              <SelectItem value="md">中型 (M)</SelectItem>
-                              <SelectItem value="lg">大型 (L)</SelectItem>
-                              <SelectItem value="xl">巨型 (XL)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-[9px] flex items-center gap-1.5 uppercase opacity-60"><Palette className="w-2.5 h-2.5" /> 歌詞顏色</Label>
-                          <Select value={activeColor} onValueChange={setActiveColor}>
-                            <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="secondary">活力青</SelectItem>
-                              <SelectItem value="white">極致白</SelectItem>
-                              <SelectItem value="yellow">亮麗黃</SelectItem>
-                              <SelectItem value="green">嫩草綠</SelectItem>
-                              <SelectItem value="pink">浪漫粉</SelectItem>
-                              <SelectItem value="cyan">星空藍</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-[9px] flex items-center gap-1.5 uppercase opacity-60"><Layout className="w-2.5 h-2.5" /> 背景主題</Label>
-                          <Select value={bgTheme} onValueChange={setBgTheme}>
-                            <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="slate-900">經典深藍</SelectItem>
-                              <SelectItem value="black">極緻純黑</SelectItem>
-                              <SelectItem value="indigo-950">午夜藍調</SelectItem>
-                              <SelectItem value="zinc-900">深邃灰質</SelectItem>
-                              <SelectItem value="rose-950">暗影玫瑰</SelectItem>
-                              <SelectItem value="emerald-950">深翡翠綠</SelectItem>
-                              <SelectItem value="purple-950">幻影紫</SelectItem>
-                              <SelectItem value="slate-950">深邃星空</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[8px] font-bold uppercase opacity-50 flex items-center gap-1"><Type className="w-2 h-2" /> 字體大小</Label>
+                        <Select value={fontSize} onValueChange={setFontSize}>
+                          <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="sm">標準</SelectItem><SelectItem value="md">中型</SelectItem><SelectItem value="lg">大型</SelectItem><SelectItem value="xl">巨型</SelectItem></SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[8px] font-bold uppercase opacity-50 flex items-center gap-1"><Palette className="w-2 h-2" /> 歌詞顏色</Label>
+                        <Select value={activeColor} onValueChange={setActiveColor}>
+                          <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="secondary">活力青</SelectItem><SelectItem value="white">極致白</SelectItem><SelectItem value="yellow">亮麗黃</SelectItem><SelectItem value="green">嫩草綠</SelectItem><SelectItem value="pink">浪漫粉</SelectItem><SelectItem value="cyan">星空藍</SelectItem></SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[8px] font-bold uppercase opacity-50 flex items-center gap-1"><Layout className="w-2 h-2" /> 背景主題</Label>
+                        <Select value={bgTheme} onValueChange={setBgTheme}>
+                          <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="slate-900">經典深藍</SelectItem><SelectItem value="black">極緻純黑</SelectItem><SelectItem value="indigo-950">午夜藍調</SelectItem><SelectItem value="zinc-900">深邃灰質</SelectItem><SelectItem value="rose-950">暗影玫瑰</SelectItem><SelectItem value="emerald-950">翡翠綠</SelectItem><SelectItem value="purple-950">幻影紫</SelectItem><SelectItem value="slate-950">星空藍</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   </div>
                 </>
               ) : (
-                <div className="py-20 text-center opacity-10">
-                  <Play className="w-8 h-8 mx-auto mb-2" />
-                  <p className="text-[9px] uppercase font-bold">等待播放中</p>
-                </div>
+                <div className="py-10 text-center opacity-10"><Play className="w-6 h-6 mx-auto" /></div>
               )}
             </div>
           </ScrollArea>
@@ -661,31 +543,22 @@ export default function LyricSyncApp() {
 
       <AlertDialog open={!!trackToDelete} onOpenChange={(open) => !open && setTrackToDelete(null)}>
         <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>刪除歌曲？</AlertDialogTitle>
-            <AlertDialogDescription>這將永久移除歌曲與歌詞。</AlertDialogDescription>
-          </AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>刪除歌曲？</AlertDialogTitle><AlertDialogDescription>這將永久移除歌曲與歌詞。</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction onClick={async () => {
               if (trackToDelete) {
                 await deleteTrackFromDB(trackToDelete);
-                setPlaylist(playlist.filter(t => t.id !== trackToDelete));
+                setPlaylist(prev => prev.filter(t => t.id !== trackToDelete));
                 setTrackToDelete(null);
-                toast({ title: "已刪除", description: "歌曲已移除。" });
+                toast({ title: "已刪除" });
               }
-            }} className="bg-destructive text-destructive-foreground">確認刪除</AlertDialogAction>
+            }} className="bg-destructive text-destructive-foreground">確認</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <audio 
-        ref={audioRef}
-        onTimeUpdate={() => audioRef.current && setCurrentTime(audioRef.current.currentTime)}
-        onLoadedMetadata={() => audioRef.current && setDuration(audioRef.current.duration)}
-        onEnded={() => skipTrack('next')}
-        onPlay={() => setIsPlaying(true)}
-        onPause={() => setIsPlaying(false)}
-      />
+      <audio ref={audioRef} onTimeUpdate={() => audioRef.current && setCurrentTime(audioRef.current.currentTime)} onLoadedMetadata={() => audioRef.current && setDuration(audioRef.current.duration)} onEnded={() => skipTrack('next')} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} />
       <Toaster />
     </div>
   );
