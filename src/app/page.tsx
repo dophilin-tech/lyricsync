@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
@@ -523,10 +524,16 @@ export default function LyricSyncApp() {
         </Card>
 
         {/* Lyrics Card - Main Focus */}
-        <Card className={cn(
-          "lg:col-span-6 flex flex-col relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-xl order-1 lg:order-2",
-          getBgThemeClass()
-        )}>
+        <Card 
+          onDoubleClick={(e) => {
+            e.preventDefault();
+            togglePlay();
+          }}
+          className={cn(
+            "lg:col-span-6 flex flex-col relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-xl order-1 lg:order-2 cursor-pointer",
+            getBgThemeClass()
+          )}
+        >
           {/* Subtle background effects */}
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-black/40 pointer-events-none" />
           
@@ -535,7 +542,7 @@ export default function LyricSyncApp() {
               <div className="flex-1 overflow-hidden relative">
                 <div 
                   ref={lyricScrollRef}
-                  className="h-full space-y-4 overflow-y-auto no-scrollbar pt-[15%] pb-[40%] px-6"
+                  className="h-full space-y-4 overflow-y-auto no-scrollbar pt-[10%] pb-[40%] px-6"
                 >
                   {currentTrack.parsedLrc && currentTrack.parsedLrc.length > 0 ? (
                     currentTrack.parsedLrc.map((line, i) => (
