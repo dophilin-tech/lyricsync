@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
@@ -99,7 +98,7 @@ export default function LyricSyncApp() {
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
-  // Hook 1: 環境偵測
+  // Hooks MUST be called unconditionally at the top
   useEffect(() => {
     const isInIframe = window.self !== window.top;
     setIsIframe(isInIframe);
@@ -108,7 +107,6 @@ export default function LyricSyncApp() {
     }
   }, []);
 
-  // Hook 2: Wake Lock 請求函數
   const requestWakeLock = useCallback(async () => {
     if (!('wakeLock' in navigator)) return;
     try {
@@ -124,7 +122,6 @@ export default function LyricSyncApp() {
     }
   }, [wakeLock]);
 
-  // Hook 3: 自動喚醒鎖定
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && isPlaying) {
@@ -145,16 +142,14 @@ export default function LyricSyncApp() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (wakeLock) wakeLock.release().catch(() => {});
     };
-  }, [isPlaying, requestWakeLock]);
+  }, [isPlaying, requestWakeLock, wakeLock]);
 
-  // Hook 4: 全螢幕監聽
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // Hook 5: 載入資料庫
   useEffect(() => {
     const loadTracks = async () => {
       try {
@@ -183,16 +178,13 @@ export default function LyricSyncApp() {
     loadTracks();
   }, []);
 
-  // Hook 6: 音量更新
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
-  // 計算變數 (非 Hook)
   const adjustedCurrentTime = currentTime - syncOffset;
   const activeLyricIndex = currentTrack?.parsedLrc?.findLastIndex(l => l.time <= adjustedCurrentTime) ?? -1;
 
-  // Hook 7: 歌詞捲動 (必須放在早前回傳之前)
   useEffect(() => {
     if (lyricScrollRef.current) {
       if (activeLyricIndex !== -1) {
@@ -204,7 +196,74 @@ export default function LyricSyncApp() {
     }
   }, [activeLyricIndex, currentTime]);
 
-  // 功能函數
+  // Conditional early return for iframe detection
+  if (isIframe && !isAppLaunched) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
+        <div className="w-24 h-24 bg-primary rounded-3xl flex items-center justify-center text-primary-foreground shadow-2xl shadow-primary/40 mb-8 animate-bounce">
+          <Music className="w-12 h-12" />
+        </div>
+        <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">LyricSync</h1>
+        <p className="text-slate-400 max-w-md mb-12 text-lg leading-relaxed">
+          偵測到您正在預覽環境中。為了支援<strong>「螢幕常亮」</strong>與<strong>「全螢幕」</strong>，請點擊下方按鈕在獨立網頁中開啟。
+        </p>
+        <Button 
+          size="lg" 
+          onClick={() => { window.open(window.location.href, '_blank'); setIsAppLaunched(true); }}
+          className="h-16 px-12 text-xl font-bold gap-3 rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-transform"
+        >
+          <Zap className="w-6 h-6 fill-current" />
+          立即啟動 App
+        </Button>
+      </div>
+    );
+  }
+
+  // UI Helper functions
+  const getFontSizeClass = () => {
+    switch (fontSize) {
+      case 'sm': return 'text-xl md:text-2xl';
+      case 'md': return 'text-2xl md:text-3xl';
+      case 'lg': return 'text-3xl md:text-5xl';
+      case 'xl': return 'text-4xl md:text-7xl';
+      default: return 'text-2xl md:text-3xl';
+    }
+  };
+
+  const getActiveColorClass = () => {
+    switch (activeColor) {
+      case 'secondary': return 'text-secondary';
+      case 'white': return 'text-white';
+      case 'yellow': return 'text-yellow-400';
+      case 'green': return 'text-green-400';
+      case 'pink': return 'text-pink-400';
+      case 'cyan': return 'text-cyan-400';
+      default: return 'text-secondary';
+    }
+  };
+
+  const getBgThemeClass = () => {
+    switch (bgTheme) {
+      case 'slate-900': return 'bg-slate-900';
+      case 'black': return 'bg-black';
+      case 'indigo-950': return 'bg-indigo-950';
+      case 'zinc-900': return 'bg-zinc-900';
+      case 'rose-950': return 'bg-rose-950';
+      default: return 'bg-slate-900';
+    }
+  };
+
+  const getThemeHex = () => {
+    switch (bgTheme) {
+      case 'slate-900': return '#0f172a';
+      case 'black': return '#000000';
+      case 'indigo-950': return '#1e1b4b';
+      case 'zinc-900': return '#18181b';
+      case 'rose-950': return '#450a0a';
+      default: return '#0f172a';
+    }
+  };
+
   const toggleFullscreen = (force?: boolean) => {
     if (force === true || !document.fullscreenElement) {
       if (!document.fullscreenElement) {
@@ -314,78 +373,9 @@ export default function LyricSyncApp() {
     }
   };
 
-  // UI 樣式輔助
-  const getFontSizeClass = () => {
-    switch (fontSize) {
-      case 'sm': return 'text-xl md:text-2xl';
-      case 'md': return 'text-2xl md:text-3xl';
-      case 'lg': return 'text-3xl md:text-5xl';
-      case 'xl': return 'text-4xl md:text-7xl';
-      default: return 'text-2xl md:text-3xl';
-    }
-  };
-
-  const getActiveColorClass = () => {
-    switch (activeColor) {
-      case 'secondary': return 'text-secondary';
-      case 'white': return 'text-white';
-      case 'yellow': return 'text-yellow-400';
-      case 'green': return 'text-green-400';
-      case 'pink': return 'text-pink-400';
-      case 'cyan': return 'text-cyan-400';
-      default: return 'text-secondary';
-    }
-  };
-
-  const getBgThemeClass = () => {
-    switch (bgTheme) {
-      case 'slate-900': return 'bg-slate-900';
-      case 'black': return 'bg-black';
-      case 'indigo-950': return 'bg-indigo-950';
-      case 'zinc-900': return 'bg-zinc-900';
-      case 'rose-950': return 'bg-rose-950';
-      default: return 'bg-slate-900';
-    }
-  };
-
-  const getThemeHex = () => {
-    switch (bgTheme) {
-      case 'slate-900': return '#0f172a';
-      case 'black': return '#000000';
-      case 'indigo-950': return '#1e1b4b';
-      case 'zinc-900': return '#18181b';
-      case 'rose-950': return '#450a0a';
-      default: return '#0f172a';
-    }
-  };
-
-  // 早前回傳 (用於 iframe 跳轉提示) - 必須放在所有 Hook 之後
-  if (isIframe && !isAppLaunched) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
-        <div className="w-24 h-24 bg-primary rounded-3xl flex items-center justify-center text-primary-foreground shadow-2xl shadow-primary/40 mb-8 animate-bounce">
-          <Music className="w-12 h-12" />
-        </div>
-        <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">LyricSync</h1>
-        <p className="text-slate-400 max-w-md mb-12 text-lg leading-relaxed">
-          偵測到您正在預覽環境中。為了支援<strong>「螢幕常亮」</strong>與<strong>「全螢幕」</strong>，請點擊下方按鈕在獨立網頁中開啟。
-        </p>
-        <Button 
-          size="lg" 
-          onClick={() => { window.open(window.location.href, '_blank'); setIsAppLaunched(true); }}
-          className="h-16 px-12 text-xl font-bold gap-3 rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-transform"
-        >
-          <Zap className="w-6 h-6 fill-current" />
-          立即啟動 App
-        </Button>
-      </div>
-    );
-  }
-
-  // 主要介面回傳
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center p-0 md:p-8">
-      <header className="w-full max-w-7xl flex justify-between items-center py-2 px-4">
+    <div className="min-h-screen bg-background flex flex-col items-center p-0">
+      <header className="w-full max-w-7xl flex justify-between items-center py-2 px-4 z-10">
         <div className="flex items-center gap-2">
           <div className="bg-primary p-1.5 rounded-lg text-primary-foreground">
             <Music className="w-4 h-4" />
@@ -400,8 +390,8 @@ export default function LyricSyncApp() {
         </div>
       </header>
 
-      <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 items-stretch p-2">
-        {/* 播放清單卡片 */}
+      <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-2 flex-1 items-stretch p-2 pt-0">
+        {/* Playlist Card */}
         <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur order-2 lg:order-1">
           <div className="p-3 border-b flex flex-col gap-3 bg-muted/30">
             <div className="flex items-center justify-between">
@@ -491,13 +481,13 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
-        {/* 歌詞顯示卡片 */}
-        <Card onClick={togglePlay} className={cn("lg:col-span-6 h-[500px] lg:h-[700px] relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-3xl order-1 lg:order-2 cursor-pointer group/lyrics", getBgThemeClass(), "text-white")}>
+        {/* Lyrics Card - Stretched to top */}
+        <Card onClick={togglePlay} className={cn("lg:col-span-6 h-[550px] lg:h-full relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-3xl order-1 lg:order-2 cursor-pointer group/lyrics", getBgThemeClass(), "text-white")}>
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20 pointer-events-none" />
           {currentTrack ? (
             <div className="relative h-full flex flex-col">
               <div className="flex-1 overflow-hidden relative">
-                <div ref={lyricScrollRef} className="h-full space-y-6 overflow-y-auto no-scrollbar pt-4 pb-[45%] px-6 md:px-12">
+                <div ref={lyricScrollRef} className="h-full space-y-6 overflow-y-auto no-scrollbar pt-[15%] pb-[45%] px-6 md:px-12">
                   {currentTrack.parsedLrc && currentTrack.parsedLrc.length > 0 ? (
                     currentTrack.parsedLrc.map((line, i) => (
                       <div key={i} className={cn(getFontSizeClass(), "font-bold transition-all duration-300 transform break-words whitespace-pre-wrap leading-tight", i === activeLyricIndex ? `${getActiveColorClass()} scale-105 origin-left opacity-100 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]` : 'text-white/20 opacity-100')}>
@@ -512,7 +502,7 @@ export default function LyricSyncApp() {
                     </div>
                   )}
                 </div>
-                <div className="absolute top-0 left-0 right-0 h-12 pointer-events-none" style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }} />
+                <div className="absolute top-0 left-0 right-0 h-20 pointer-events-none" style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }} />
                 <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none" style={{ background: `linear-gradient(to top, ${getThemeHex()}, transparent)` }} />
               </div>
             </div>
@@ -526,7 +516,7 @@ export default function LyricSyncApp() {
           )}
         </Card>
 
-        {/* 控制面板卡片 */}
+        {/* Control Panel Card */}
         <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md order-3">
           <ScrollArea className="flex-1 p-5">
             <div className="space-y-6">
