@@ -18,7 +18,8 @@ import {
   Minimize,
   Repeat,
   Zap,
-  FileText
+  FileText,
+  Layout
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -69,7 +70,7 @@ interface Track extends Omit<TrackData, 'mp3Blob'> {
 }
 
 export default function LyricSyncApp() {
-  // Hooks MUST be called unconditionally at the top
+  // --- Hooks must be called unconditionally at the top ---
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -87,6 +88,7 @@ export default function LyricSyncApp() {
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
 
+  // Settings with persistence
   const [fontSize, setFontSize] = useState<string>("md");
   const [activeColor, setActiveColor] = useState<string>("secondary");
   const [bgTheme, setBgTheme] = useState<string>("slate-900");
@@ -97,6 +99,24 @@ export default function LyricSyncApp() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lyricScrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Load settings from localStorage
+  useEffect(() => {
+    const savedFontSize = localStorage.getItem('lyricSync_fontSize');
+    const savedActiveColor = localStorage.getItem('lyricSync_activeColor');
+    const savedBgTheme = localStorage.getItem('lyricSync_bgTheme');
+    
+    if (savedFontSize) setFontSize(savedFontSize);
+    if (savedActiveColor) setActiveColor(savedActiveColor);
+    if (savedBgTheme) setBgTheme(savedBgTheme);
+  }, []);
+
+  // Save settings to localStorage
+  useEffect(() => {
+    localStorage.setItem('lyricSync_fontSize', fontSize);
+    localStorage.setItem('lyricSync_activeColor', activeColor);
+    localStorage.setItem('lyricSync_bgTheme', bgTheme);
+  }, [fontSize, activeColor, bgTheme]);
 
   useEffect(() => {
     const isInIframe = window.self !== window.top;
@@ -215,7 +235,7 @@ export default function LyricSyncApp() {
     );
   }
 
-  // UI Helper functions
+  // --- UI Helper functions ---
   const getFontSizeClass = () => {
     switch (fontSize) {
       case 'sm': return 'text-xl md:text-2xl';
@@ -245,6 +265,9 @@ export default function LyricSyncApp() {
       case 'indigo-950': return 'bg-indigo-950';
       case 'zinc-900': return 'bg-zinc-900';
       case 'rose-950': return 'bg-rose-950';
+      case 'emerald-950': return 'bg-[#064e3b]';
+      case 'purple-950': return 'bg-[#3b0764]';
+      case 'slate-950': return 'bg-[#020617]';
       default: return 'bg-slate-900';
     }
   };
@@ -256,6 +279,9 @@ export default function LyricSyncApp() {
       case 'indigo-950': return '#1e1b4b';
       case 'zinc-900': return '#18181b';
       case 'rose-950': return '#450a0a';
+      case 'emerald-950': return '#064e3b';
+      case 'purple-950': return '#3b0764';
+      case 'slate-950': return '#020617';
       default: return '#0f172a';
     }
   };
@@ -337,7 +363,6 @@ export default function LyricSyncApp() {
       let parsedLrc: LrcLine[] = [];
 
       if (!newLyricsText) {
-        // AI 自動聽寫模式
         toast({ title: "AI 聽寫中", description: "偵測到無歌詞輸入，正在由 AI 自動從歌曲中聽寫歌詞並同步..." });
         const aiRes = await transcribeMp3ToLrc({
           mp3DataUri,
@@ -347,7 +372,6 @@ export default function LyricSyncApp() {
         lrcContent = aiRes.lrcContent;
         toast({ title: "聽寫完成", description: "AI 已完成自動聽寫與同步！" });
       } else {
-        // AI 同步模式
         try {
           toast({ title: "同步中", description: "AI 正在分析音訊以對齊歌詞時間..." });
           const aiRes = await generateLrcFromMp3AndLyrics({
@@ -359,7 +383,7 @@ export default function LyricSyncApp() {
           lrcContent = aiRes.lrcContent;
           toast({ title: "同步成功", description: "AI 已完成歌詞同步！" });
         } catch (err) {
-          lrcContent = ""; // Fallback
+          lrcContent = "";
           toast({ title: "同步失敗", description: "AI 同步發生錯誤，將使用純文字模式。", variant: "destructive" });
         }
       }
@@ -388,51 +412,51 @@ export default function LyricSyncApp() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center p-0">
-      <header className="w-full max-w-7xl flex justify-between items-center py-2 px-4 z-10">
+      <header className="w-full max-w-7xl flex justify-between items-center py-1.5 px-4 z-10 bg-background/80 backdrop-blur-sm sticky top-0">
         <div className="flex items-center gap-2">
-          <div className="bg-primary p-1.5 rounded-lg text-primary-foreground">
-            <Music className="w-4 h-4" />
+          <div className="bg-primary p-1 rounded-lg text-primary-foreground">
+            <Music className="w-3.5 h-3.5" />
           </div>
-          <h1 className="text-lg font-bold tracking-tight text-primary">LyricSync</h1>
+          <h1 className="text-sm font-bold tracking-tight text-primary">LyricSync</h1>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => toggleFullscreen()} className="h-8 gap-1.5 px-2">
-            {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
-            <span className="hidden sm:inline text-xs">{isFullscreen ? "退出" : "全螢幕"}</span>
+          <Button variant="ghost" size="sm" onClick={() => toggleFullscreen()} className="h-7 gap-1 px-2 text-xs">
+            {isFullscreen ? <Minimize className="w-3 h-3" /> : <Maximize className="w-3 h-3" />}
+            <span className="hidden sm:inline">{isFullscreen ? "退出" : "全螢幕"}</span>
           </Button>
         </div>
       </header>
 
-      <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-2 flex-1 items-stretch p-2 pt-0">
+      <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-1.5 flex-1 items-stretch p-1.5 pt-0">
         {/* Playlist Card */}
-        <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur order-2 lg:order-1">
-          <div className="p-3 border-b flex flex-col gap-3 bg-muted/30">
+        <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-lg bg-card/50 backdrop-blur order-2 lg:order-1">
+          <div className="p-3 border-b flex flex-col gap-2.5 bg-muted/30">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold flex items-center gap-2">
-                <ListMusic className="w-3.5 h-3.5 text-primary" /> 播放清單
+              <h2 className="text-xs font-semibold flex items-center gap-2">
+                <ListMusic className="w-3 h-3 text-primary" /> 播放清單
               </h2>
-              <span className="text-[10px] text-muted-foreground font-medium">
+              <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-tighter">
                 {isLoadingDB ? "載入中..." : `${playlist.length} 首歌曲`}
               </span>
             </div>
 
-            <div className="flex gap-2">
-              <Button onClick={togglePlay} className={cn("flex-1 gap-2 h-10 shadow-lg text-sm", isPlaying ? "bg-orange-600 hover:bg-orange-700" : "bg-primary hover:bg-primary/90")}>
-                {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
-                {isPlaying ? "停止" : "開始"}
+            <div className="flex gap-1.5">
+              <Button onClick={togglePlay} className={cn("flex-1 gap-2 h-9 shadow-md text-xs font-bold", isPlaying ? "bg-orange-600 hover:bg-orange-700" : "bg-primary hover:bg-primary/90")}>
+                {isPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                {isPlaying ? "停止播放" : "開始播放"}
               </Button>
               
               <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="secondary" size="icon" className="h-10 w-10 shadow-lg shrink-0">
-                    <Upload className="w-4 h-4" />
+                  <Button variant="secondary" size="icon" className="h-9 w-9 shadow-md shrink-0">
+                    <Upload className="w-3.5 h-3.5" />
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[450px]">
                   <DialogHeader>
                     <DialogTitle>新增歌曲</DialogTitle>
                     <DialogDescription>
-                      請選擇 MP3 檔案。歌詞為選填，若留空將由 AI 自動從歌曲中聽寫生成。
+                      請選擇 MP3。歌詞為選填，若留空將由 AI 自動聽寫。
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
@@ -446,34 +470,34 @@ export default function LyricSyncApp() {
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="lyrics-file" className="text-xs font-bold flex items-center gap-2">
-                        <FileText className="w-3 h-3" /> 3. 歌詞文字 (選填)
+                        <FileText className="w-3 h-3" /> 3. 歌詞來源 (選填)
                       </Label>
                       <div className="flex gap-2 mb-1">
                         <Input id="lyrics-file" type="file" accept=".txt" onChange={handleLyricsFileChange} className="text-[10px] h-7 px-2" />
                       </div>
                       <textarea 
                         id="lyrics" 
-                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         value={newLyricsText}
                         onChange={e => setNewLyricsText(e.target.value)}
-                        placeholder="在此貼上歌詞... 或留空由 AI 自動聽寫"
+                        placeholder="手動貼上歌詞... 或留空由 AI 自動聽寫"
                       />
                     </div>
                   </div>
                   <DialogFooter>
                     <Button onClick={handleFileUpload} disabled={isProcessing || !newMp3File} className="w-full">
-                      {isProcessing ? "AI 正在處理中..." : (newLyricsText ? "開始 AI 同步" : "開始 AI 自動聽寫")}
+                      {isProcessing ? "AI 處理中..." : (newLyricsText ? "開始 AI 同步" : "開始 AI 聽寫同步")}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
             </div>
           </div>
-          <ScrollArea className="flex-1 min-h-[200px]">
+          <ScrollArea className="flex-1 min-h-[150px]">
             {playlist.length === 0 && !isLoadingDB ? (
               <div className="p-8 text-center text-muted-foreground opacity-30">
-                <Music className="w-10 h-10 mx-auto mb-2" />
-                <p className="text-xs">尚未新增歌曲。</p>
+                <Music className="w-8 h-8 mx-auto mb-2" />
+                <p className="text-[10px]">尚未新增歌曲</p>
               </div>
             ) : (
               playlist.map((track, index) => (
@@ -487,7 +511,7 @@ export default function LyricSyncApp() {
                     ) : <Music className="w-3 h-3" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate leading-none">{track.title}</p>
+                    <p className="text-[11px] font-medium truncate leading-none">{track.title}</p>
                   </div>
                   <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-destructive" onClick={(e) => { e.stopPropagation(); setTrackToDelete(track.id); }}>
                     <Trash2 className="w-3 h-3" />
@@ -498,13 +522,13 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
-        {/* Lyrics Card - Stretched to top */}
-        <Card onClick={togglePlay} className={cn("lg:col-span-6 h-[550px] lg:h-full relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-3xl order-1 lg:order-2 cursor-pointer group/lyrics", getBgThemeClass(), "text-white")}>
+        {/* Lyrics Card - Optimized for mobile top view */}
+        <Card onClick={togglePlay} className={cn("lg:col-span-6 h-[500px] lg:h-full relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-2xl order-1 lg:order-2 cursor-pointer group/lyrics", getBgThemeClass(), "text-white")}>
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20 pointer-events-none" />
           {currentTrack ? (
             <div className="relative h-full flex flex-col">
               <div className="flex-1 overflow-hidden relative">
-                <div ref={lyricScrollRef} className="h-full space-y-6 overflow-y-auto no-scrollbar pt-[15%] pb-[45%] px-6 md:px-12">
+                <div ref={lyricScrollRef} className="h-full space-y-5 overflow-y-auto no-scrollbar pt-[10%] pb-[40%] px-6 md:px-12">
                   {currentTrack.parsedLrc && currentTrack.parsedLrc.length > 0 ? (
                     currentTrack.parsedLrc.map((line, i) => (
                       <div key={i} className={cn(getFontSizeClass(), "font-bold transition-all duration-300 transform break-words whitespace-pre-wrap leading-tight", i === activeLyricIndex ? `${getActiveColorClass()} scale-105 origin-left opacity-100 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]` : 'text-white/20 opacity-100')}>
@@ -519,82 +543,104 @@ export default function LyricSyncApp() {
                     </div>
                   )}
                 </div>
-                <div className="absolute top-0 left-0 right-0 h-20 pointer-events-none" style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }} />
-                <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none" style={{ background: `linear-gradient(to top, ${getThemeHex()}, transparent)` }} />
+                <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none" style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }} />
+                <div className="absolute bottom-0 left-0 right-0 h-24 pointer-events-none" style={{ background: `linear-gradient(to top, ${getThemeHex()}, transparent)` }} />
               </div>
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center p-12 space-y-6 opacity-40">
-              <div className="w-20 h-20 rounded-full bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                <Music className="w-10 h-10 text-indigo-400" />
+            <div className="h-full flex flex-col items-center justify-center text-center p-12 space-y-6 opacity-30">
+              <div className="w-16 h-16 rounded-3xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                <Music className="w-8 h-8 text-primary" />
               </div>
-              <h3 className="text-xl font-bold">請點擊上傳或選擇歌曲</h3>
+              <p className="text-sm font-bold uppercase tracking-widest">請新增或選擇歌曲</p>
             </div>
           )}
         </Card>
 
         {/* Control Panel Card */}
-        <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md order-3">
-          <ScrollArea className="flex-1 p-5">
-            <div className="space-y-6">
+        <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-lg bg-card/80 backdrop-blur-md order-3">
+          <ScrollArea className="flex-1 p-4">
+            <div className="space-y-5">
               {currentTrack ? (
                 <>
                   <div>
-                    <h2 className="text-lg font-bold font-headline mb-0.5 line-clamp-2 leading-tight">{currentTrack.title}</h2>
-                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">已載入 AI 同步歌詞</p>
+                    <h2 className="text-sm font-bold font-headline mb-0.5 line-clamp-2 leading-tight">{currentTrack.title}</h2>
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest font-bold">AI 同步完成</p>
                   </div>
                   <Separator />
                   <div className="space-y-3">
-                    <Slider value={[currentTime]} max={duration || 100} step={0.1} onValueChange={(v) => { if (audioRef.current) audioRef.current.currentTime = v[0]; }} className="cursor-pointer h-4" />
+                    <Slider value={[currentTime]} max={duration || 100} step={0.1} onValueChange={(v) => { if (audioRef.current) audioRef.current.currentTime = v[0]; }} className="h-4" />
                     <div className="flex justify-between text-[9px] font-mono text-muted-foreground">
                       <span>{formatTime(currentTime)}</span>
                       <span>{formatTime(duration)}</span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-center gap-5">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => skipTrack('prev')}><SkipBack className="w-5 h-5" /></Button>
-                    <Button size="icon" className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 shadow-xl shadow-primary/30" onClick={togglePlay}>
-                      {isPlaying ? <Pause className="w-7 h-7 fill-current" /> : <Play className="w-7 h-7 fill-current ml-1" />}
+                  <div className="flex items-center justify-center gap-4">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => skipTrack('prev')}><SkipBack className="w-4 h-4" /></Button>
+                    <Button size="icon" className="h-12 w-12 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20" onClick={togglePlay}>
+                      {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => skipTrack('next')}><SkipForward className="w-5 h-5" /></Button>
-                  </div>
-                  <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-muted-foreground opacity-60">
-                    <Repeat className="w-2.5 h-2.5 text-primary" /> <span>連續播放模式</span>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => skipTrack('next')}><SkipForward className="w-4 h-4" /></Button>
                   </div>
                   <Separator />
-                  <div className="space-y-5">
+                  <div className="space-y-4">
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between text-[9px] text-muted-foreground font-bold uppercase">
-                        <div className="flex items-center gap-1.5"><Volume2 className="w-3 h-3" /> 音量</div>
+                      <div className="flex items-center justify-between text-[8px] text-muted-foreground font-bold uppercase">
+                        <div className="flex items-center gap-1"><Volume2 className="w-2.5 h-2.5" /> 音量</div>
                         <span>{Math.round(volume * 100)}%</span>
                       </div>
-                      <Slider value={[volume * 100]} max={100} onValueChange={(v) => setVolume(v[0] / 100)} className="h-4" />
+                      <Slider value={[volume * 100]} max={100} onValueChange={(v) => setVolume(v[0] / 100)} className="h-3.5" />
                     </div>
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between text-[9px] text-muted-foreground font-bold uppercase">
-                        <div className="flex items-center gap-1.5"><Timer className="w-3 h-3" /> 同步偏移</div>
-                        <Badge variant="secondary" className="px-1 h-3.5 text-[8px] bg-orange-500/10 text-orange-600 border-none">
-                          {syncOffset > 0 ? '+' : ''}{syncOffset.toFixed(1)}s
-                        </Badge>
+                      <div className="flex items-center justify-between text-[8px] text-muted-foreground font-bold uppercase">
+                        <div className="flex items-center gap-1"><Timer className="w-2.5 h-2.5" /> 偏移</div>
+                        <span className="text-orange-600">{syncOffset > 0 ? '+' : ''}{syncOffset.toFixed(1)}s</span>
                       </div>
-                      <Slider value={[syncOffset]} min={-2} max={2} step={0.1} onValueChange={(v) => setSyncOffset(v[0])} className="h-4" />
+                      <Slider value={[syncOffset]} min={-2} max={2} step={0.1} onValueChange={(v) => setSyncOffset(v[0])} className="h-3.5" />
                     </div>
-                    <div className="space-y-4 pt-2">
-                      <p className="text-[9px] text-muted-foreground uppercase font-bold opacity-50">外觀設定</p>
-                      <div className="grid grid-cols-1 gap-3">
-                        <div className="space-y-1.5">
-                          <Label className="text-[9px] flex items-center gap-1.5 uppercase opacity-60"><Type className="w-2.5 h-2.5" /> 字體</Label>
-                          <Select value={fontSize} onValueChange={setFontSize}><SelectTrigger className="h-8 text-[10px]"><SelectValue /></SelectTrigger>
+                    <Separator />
+                    <div className="space-y-3">
+                      <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-wider opacity-50">介面設定</p>
+                      <div className="grid gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-[9px] flex items-center gap-1.5 uppercase opacity-60"><Type className="w-2.5 h-2.5" /> 字體大小</Label>
+                          <Select value={fontSize} onValueChange={setFontSize}>
+                            <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="sm">小 (Small)</SelectItem><SelectItem value="md">中 (Medium)</SelectItem><SelectItem value="lg">大 (Large)</SelectItem><SelectItem value="xl">超大 (XL)</SelectItem>
+                              <SelectItem value="sm">標準 (S)</SelectItem>
+                              <SelectItem value="md">中型 (M)</SelectItem>
+                              <SelectItem value="lg">大型 (L)</SelectItem>
+                              <SelectItem value="xl">巨型 (XL)</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="space-y-1">
                           <Label className="text-[9px] flex items-center gap-1.5 uppercase opacity-60"><Palette className="w-2.5 h-2.5" /> 歌詞顏色</Label>
-                          <Select value={activeColor} onValueChange={setActiveColor}><SelectTrigger className="h-8 text-[10px]"><SelectValue /></SelectTrigger>
+                          <Select value={activeColor} onValueChange={setActiveColor}>
+                            <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="secondary">青色</SelectItem><SelectItem value="white">白色</SelectItem><SelectItem value="yellow">金黃</SelectItem><SelectItem value="green">萊姆</SelectItem><SelectItem value="pink">粉紅</SelectItem><SelectItem value="cyan">藍色</SelectItem>
+                              <SelectItem value="secondary">活力青</SelectItem>
+                              <SelectItem value="white">極致白</SelectItem>
+                              <SelectItem value="yellow">亮麗黃</SelectItem>
+                              <SelectItem value="green">嫩草綠</SelectItem>
+                              <SelectItem value="pink">浪漫粉</SelectItem>
+                              <SelectItem value="cyan">星空藍</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-[9px] flex items-center gap-1.5 uppercase opacity-60"><Layout className="w-2.5 h-2.5" /> 背景主題</Label>
+                          <Select value={bgTheme} onValueChange={setBgTheme}>
+                            <SelectTrigger className="h-7 text-[10px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="slate-900">經典深藍</SelectItem>
+                              <SelectItem value="black">極緻純黑</SelectItem>
+                              <SelectItem value="indigo-950">午夜藍調</SelectItem>
+                              <SelectItem value="zinc-900">深邃灰質</SelectItem>
+                              <SelectItem value="rose-950">暗影玫瑰</SelectItem>
+                              <SelectItem value="emerald-950">深翡翠綠</SelectItem>
+                              <SelectItem value="purple-950">幻影紫</SelectItem>
+                              <SelectItem value="slate-950">深邃星空</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -603,9 +649,9 @@ export default function LyricSyncApp() {
                   </div>
                 </>
               ) : (
-                <div className="py-20 text-center opacity-20">
-                  <Play className="w-10 h-10 mx-auto mb-2" />
-                  <p className="text-[10px] uppercase font-bold">待機中</p>
+                <div className="py-20 text-center opacity-10">
+                  <Play className="w-8 h-8 mx-auto mb-2" />
+                  <p className="text-[9px] uppercase font-bold">等待播放中</p>
                 </div>
               )}
             </div>
