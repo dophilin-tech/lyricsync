@@ -9,25 +9,19 @@ import {
   SkipForward, 
   Volume2, 
   Music, 
-  FileText, 
   Upload, 
-  Sparkles, 
   Trash2,
   ListMusic,
   Timer,
   Info,
   Type,
   Palette,
-  Layout,
-  HardDrive,
   Maximize,
   Minimize,
-  Sun,
   Repeat,
-  AlertCircle,
-  RefreshCw,
   ExternalLink,
-  Zap
+  Zap,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -91,13 +85,9 @@ export default function LyricSyncApp() {
   const [isIframe, setIsIframe] = useState(false);
   const [isAppLaunched, setIsAppLaunched] = useState(false);
   
-  // Screen Wake Lock state
   const [wakeLock, setWakeLock] = useState<any>(null);
-
-  // Deletion confirmation
   const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
 
-  // Customization states
   const [fontSize, setFontSize] = useState<string>("md");
   const [activeColor, setActiveColor] = useState<string>("secondary");
   const [bgTheme, setBgTheme] = useState<string>("slate-900");
@@ -111,7 +101,6 @@ export default function LyricSyncApp() {
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
-  // Detect iframe on mount
   useEffect(() => {
     const isInIframe = window.self !== window.top;
     setIsIframe(isInIframe);
@@ -122,7 +111,6 @@ export default function LyricSyncApp() {
 
   const requestWakeLock = useCallback(async () => {
     if (!('wakeLock' in navigator)) return;
-
     try {
       if (wakeLock) {
         await wakeLock.release();
@@ -130,14 +118,18 @@ export default function LyricSyncApp() {
       }
       const lock = await (navigator as any).wakeLock.request('screen');
       setWakeLock(lock);
-      lock.addEventListener('release', () => {
-        setWakeLock(null);
-      });
+      lock.addEventListener('release', () => setWakeLock(null));
     } catch (err: any) {
       setWakeLock(null);
-      console.warn("Wake Lock 獲取失敗:", err);
+      if (err.name === 'NotAllowedError') {
+        toast({
+          title: "螢幕常亮功能受限",
+          description: isIframe ? "偵測到預覽環境限制，請開啟獨立網頁。" : "瀏覽器封鎖了此功能，請確認 HTTPS 或手機電量。",
+          variant: "destructive"
+        });
+      }
     }
-  }, [wakeLock]);
+  }, [wakeLock, isIframe]);
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
@@ -145,7 +137,6 @@ export default function LyricSyncApp() {
         await requestWakeLock();
       }
     };
-
     if (isPlaying) {
       requestWakeLock();
       document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -156,7 +147,6 @@ export default function LyricSyncApp() {
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     }
-
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (wakeLock) wakeLock.release().catch(() => {});
@@ -164,9 +154,7 @@ export default function LyricSyncApp() {
   }, [isPlaying, requestWakeLock]);
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
@@ -182,7 +170,6 @@ export default function LyricSyncApp() {
             reader.onload = () => resolve(reader.result as string);
             reader.readAsDataURL(st.mp3Blob);
           });
-
           return {
             ...st,
             audioUrl,
@@ -192,7 +179,7 @@ export default function LyricSyncApp() {
         }));
         setPlaylist(tracksWithUrls);
       } catch (error) {
-        console.warn("Failed to load tracks from DB", error);
+        console.warn("Failed to load tracks", error);
       } finally {
         setIsLoadingDB(false);
       }
@@ -201,17 +188,13 @@ export default function LyricSyncApp() {
   }, []);
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
+    if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
   const toggleFullscreen = (force?: boolean) => {
     if (force === true || !document.fullscreenElement) {
       if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => {
-          console.warn("Fullscreen request failed", err);
-        });
+        document.documentElement.requestFullscreen().catch(() => {});
       }
     } else if (force === false || document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
@@ -220,24 +203,16 @@ export default function LyricSyncApp() {
 
   const playTrack = async (index: number) => {
     if (index < 0 || index >= playlist.length || !audioRef.current) return;
-    
     const track = playlist[index];
     setCurrentTrackIndex(index);
-    
     audioRef.current.src = track.audioUrl;
     audioRef.current.load();
-    
     try {
       await audioRef.current.play();
       requestWakeLock();
       toggleFullscreen(true);
     } catch (error) {
       console.warn("Playback failed:", error);
-      toast({ 
-        title: "播放錯誤", 
-        description: "瀏覽器封鎖了自動播放，請手動點擊播放按鈕。", 
-        variant: "destructive" 
-      });
     }
   };
 
@@ -246,29 +221,22 @@ export default function LyricSyncApp() {
       if (playlist.length > 0) playTrack(0);
       return;
     }
-
     if (audioRef.current.paused) {
       audioRef.current.play().then(() => {
         requestWakeLock();
         toggleFullscreen(true);
-      }).catch(err => {
-        console.warn(err);
-      });
+      }).catch(() => {});
     } else {
       audioRef.current.pause();
     }
   };
 
   const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-    }
+    if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
   };
 
   const handleLoadedMetadata = () => {
-    if (audioRef.current) {
-      setDuration(audioRef.current.duration);
-    }
+    if (audioRef.current) setDuration(audioRef.current.duration);
   };
 
   const handleSeek = (value: number[]) => {
@@ -287,19 +255,26 @@ export default function LyricSyncApp() {
   };
 
   const handleTrackEnded = () => {
-    if (playlist.length > 0) {
-      skipTrack('next');
-    } else {
-      setIsPlaying(false);
-    }
+    if (playlist.length > 0) skipTrack('next');
+    else setIsPlaying(false);
+  };
+
+  const handleLyricsFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      setNewLyricsText(text);
+    };
+    reader.readAsText(file);
   };
 
   const handleFileUpload = async () => {
     if (!newMp3File || !newLyricsText) {
-      toast({ title: "錯誤", description: "請填寫歌曲名稱並選擇 MP3 與輸入歌詞。", variant: "destructive" });
+      toast({ title: "錯誤", description: "請選擇 MP3 並輸入歌詞。", variant: "destructive" });
       return;
     }
-
     setIsProcessing(true);
     try {
       const audioUrl = URL.createObjectURL(newMp3File);
@@ -308,13 +283,10 @@ export default function LyricSyncApp() {
         reader.onload = () => resolve(reader.result as string);
         reader.readAsDataURL(newMp3File);
       });
-      
       const finalTitle = newTitle || newMp3File.name.replace(/\.[^/.]+$/, "");
       const finalArtist = "未知歌手";
-
       let lrcContent = "";
       let parsedLrc: LrcLine[] = [];
-
       try {
         toast({ title: "同步中", description: "AI 正在分析音訊以對齊歌詞時間..." });
         const aiRes = await generateLrcFromMp3AndLyrics({
@@ -330,38 +302,18 @@ export default function LyricSyncApp() {
         console.warn(err);
         toast({ title: "AI 錯誤", description: "同步失敗，將使用純文字歌詞。", variant: "destructive" });
       }
-
       const trackId = Date.now().toString();
       const trackData: TrackData = {
-        id: trackId,
-        title: finalTitle,
-        artist: finalArtist,
-        mp3Blob: newMp3File,
-        lyricsText: newLyricsText,
-        lrcContent,
+        id: trackId, title: finalTitle, artist: finalArtist,
+        mp3Blob: newMp3File, lyricsText: newLyricsText, lrcContent,
         createdAt: Date.now()
       };
-
       await saveTrackToDB(trackData);
-
-      const newTrack: Track = {
-        ...trackData,
-        audioUrl,
-        mp3DataUri,
-        parsedLrc
-      };
-
+      const newTrack: Track = { ...trackData, audioUrl, mp3DataUri, parsedLrc };
       const newPlaylist = [...playlist, newTrack];
       setPlaylist(newPlaylist);
-      
-      if (currentTrackIndex === -1) {
-        playTrack(newPlaylist.length - 1);
-      }
-      
-      setNewTitle("");
-      setNewMp3File(null);
-      setNewLyricsText("");
-      setIsUploadOpen(false);
+      if (currentTrackIndex === -1) playTrack(newPlaylist.length - 1);
+      setNewTitle(""); setNewMp3File(null); setNewLyricsText(""); setIsUploadOpen(false);
     } catch (error) {
       console.warn(error);
       toast({ title: "上傳失敗", description: "處理檔案時發生錯誤。", variant: "destructive" });
@@ -376,9 +328,7 @@ export default function LyricSyncApp() {
       await deleteTrackFromDB(trackToDelete);
       const indexToRemove = playlist.findIndex(t => t.id === trackToDelete);
       const newPlaylist = playlist.filter(t => t.id !== trackToDelete);
-      
       setPlaylist(newPlaylist);
-      
       if (currentTrackIndex === indexToRemove) {
         setCurrentTrackIndex(-1);
         setIsPlaying(false);
@@ -388,31 +338,12 @@ export default function LyricSyncApp() {
       toast({ title: "已刪除", description: "歌曲已從裝置儲存中移除。" });
     } catch (error) {
       console.warn(error);
-      toast({ title: "錯誤", description: "無法刪除歌曲。", variant: "destructive" });
     } finally {
       setTrackToDelete(null);
     }
   };
 
-  const adjustedCurrentTime = currentTime - syncOffset;
-  const activeLyricIndex = currentTrack?.parsedLrc?.findLastIndex(l => l.time <= adjustedCurrentTime) ?? -1;
-
-  useEffect(() => {
-    if (lyricScrollRef.current) {
-      if (activeLyricIndex !== -1) {
-        const activeEl = lyricScrollRef.current.children[activeLyricIndex] as HTMLElement;
-        if (activeEl) {
-          activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      } else if (currentTime === 0) {
-        lyricScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    }
-  }, [activeLyricIndex, currentTime]);
-
-  const openInNewTab = () => {
-    window.open(window.location.href, '_blank');
-  };
+  const openInNewTab = () => window.open(window.location.href, '_blank');
 
   const getFontSizeClass = () => {
     switch (fontSize) {
@@ -470,10 +401,7 @@ export default function LyricSyncApp() {
         </p>
         <Button 
           size="lg" 
-          onClick={() => {
-            openInNewTab();
-            setIsAppLaunched(true);
-          }}
+          onClick={() => { openInNewTab(); setIsAppLaunched(true); }}
           className="h-16 px-12 text-xl font-bold gap-3 rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-transform"
         >
           <Zap className="w-6 h-6 fill-current" />
@@ -483,28 +411,29 @@ export default function LyricSyncApp() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-background flex flex-col items-center p-2 md:p-8 pt-2">
-      {isIframe && (
-        <div className="w-full max-w-7xl mb-2 p-3 bg-primary/10 border border-primary/20 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-2 animate-in fade-in slide-in-from-top-4 duration-500">
-          <div className="flex items-center gap-2 text-primary">
-            <Info className="w-4 h-4 shrink-0" />
-            <p className="text-xs font-medium">環境偵測：預覽視窗會限制「螢幕常亮」功能。</p>
-          </div>
-          <Button size="sm" onClick={openInNewTab} className="shrink-0 h-8 gap-1.5 text-xs">
-            <ExternalLink className="w-3.5 h-3.5" /> 開啟獨立網頁
-          </Button>
-        </div>
-      )}
+  const adjustedCurrentTime = currentTime - syncOffset;
+  const activeLyricIndex = currentTrack?.parsedLrc?.findLastIndex(l => l.time <= adjustedCurrentTime) ?? -1;
 
-      <header className="w-full max-w-7xl flex justify-between items-center mb-2 md:mb-6 px-2">
+  useEffect(() => {
+    if (lyricScrollRef.current) {
+      if (activeLyricIndex !== -1) {
+        const activeEl = lyricScrollRef.current.children[activeLyricIndex] as HTMLElement;
+        if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (currentTime === 0) {
+        lyricScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }, [activeLyricIndex, currentTime]);
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center p-0 md:p-8">
+      <header className="w-full max-w-7xl flex justify-between items-center py-2 px-4">
         <div className="flex items-center gap-2">
           <div className="bg-primary p-1.5 rounded-lg text-primary-foreground">
-            <Music className="w-5 h-5" />
+            <Music className="w-4 h-4" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-primary">LyricSync</h1>
+          <h1 className="text-lg font-bold tracking-tight text-primary">LyricSync</h1>
         </div>
-        
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => toggleFullscreen()} className="h-8 gap-1.5 px-2">
             {isFullscreen ? <Minimize className="w-3.5 h-3.5" /> : <Maximize className="w-3.5 h-3.5" />}
@@ -513,7 +442,7 @@ export default function LyricSyncApp() {
         </div>
       </header>
 
-      <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 items-stretch">
+      <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 items-stretch p-2">
         <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur order-2 lg:order-1">
           <div className="p-3 border-b flex flex-col gap-3 bg-muted/30">
             <div className="flex items-center justify-between">
@@ -526,13 +455,7 @@ export default function LyricSyncApp() {
             </div>
 
             <div className="flex gap-2">
-              <Button 
-                onClick={togglePlay} 
-                className={cn(
-                  "flex-1 gap-2 h-10 shadow-lg text-sm",
-                  isPlaying ? "bg-orange-600 hover:bg-orange-700" : "bg-primary hover:bg-primary/90"
-                )}
-              >
+              <Button onClick={togglePlay} className={cn("flex-1 gap-2 h-10 shadow-lg text-sm", isPlaying ? "bg-orange-600 hover:bg-orange-700" : "bg-primary hover:bg-primary/90")}>
                 {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
                 {isPlaying ? "停止" : "開始"}
               </Button>
@@ -546,25 +469,28 @@ export default function LyricSyncApp() {
                 <DialogContent className="sm:max-w-[450px]">
                   <DialogHeader>
                     <DialogTitle>新增歌曲</DialogTitle>
-                    <DialogDescription>請選擇 MP3 檔案並輸入歌詞。</DialogDescription>
+                    <DialogDescription>請選擇 MP3 檔案，並輸入或選擇歌詞檔案。</DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="mp3">音訊檔案 (MP3) *</Label>
+                      <Label htmlFor="mp3" className="text-xs font-bold">1. 音訊檔案 (MP3) *</Label>
                       <Input id="mp3" type="file" accept="audio/mpeg" onChange={e => setNewMp3File(e.target.files ? e.target.files[0] : null)} />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="title">歌曲名稱 (選填)</Label>
+                      <Label htmlFor="title" className="text-xs font-bold">2. 歌曲名稱 (選填)</Label>
                       <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="例如：Bohemian Rhapsody" />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="lyrics">歌詞內容 *</Label>
+                      <Label htmlFor="lyrics-file" className="text-xs font-bold flex items-center gap-2">
+                        <FileText className="w-3 h-3" /> 3. 歌詞來源 (.txt)
+                      </Label>
+                      <Input id="lyrics-file" type="file" accept=".txt" onChange={handleLyricsFileChange} className="text-xs" />
                       <textarea 
                         id="lyrics" 
-                        className="flex min-h-[150px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         value={newLyricsText}
                         onChange={e => setNewLyricsText(e.target.value)}
-                        placeholder="請貼上歌詞內容..."
+                        placeholder="或者在此處直接貼上歌詞內容..."
                       />
                     </div>
                   </div>
@@ -577,7 +503,7 @@ export default function LyricSyncApp() {
               </Dialog>
             </div>
           </div>
-          <ScrollArea className="flex-1 min-h-[250px]">
+          <ScrollArea className="flex-1 min-h-[200px]">
             {playlist.length === 0 && !isLoadingDB ? (
               <div className="p-8 text-center text-muted-foreground opacity-30">
                 <Music className="w-10 h-10 mx-auto mb-2" />
@@ -585,11 +511,7 @@ export default function LyricSyncApp() {
               </div>
             ) : (
               playlist.map((track, index) => (
-                <div 
-                  key={track.id}
-                  onClick={() => playTrack(index)}
-                  className={`group p-3 flex items-center gap-3 cursor-pointer border-b last:border-0 transition-colors ${index === currentTrackIndex ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-muted/50'}`}
-                >
+                <div key={track.id} onClick={() => playTrack(index)} className={`group p-3 flex items-center gap-3 cursor-pointer border-b last:border-0 transition-colors ${index === currentTrackIndex ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-muted/50'}`}>
                   <div className="relative w-6 h-6 bg-primary/20 rounded-md flex items-center justify-center text-primary shrink-0">
                     {index === currentTrackIndex && isPlaying ? (
                       <div className="flex gap-0.5 items-end h-2">
@@ -610,49 +532,27 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
-        <Card 
-          onClick={togglePlay}
-          className={cn(
-            "lg:col-span-6 h-[550px] lg:h-[700px] relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-3xl order-1 lg:order-2 cursor-pointer group/lyrics",
-            getBgThemeClass(),
-            "text-white"
-          )}
-        >
+        <Card onClick={togglePlay} className={cn("lg:col-span-6 h-[500px] lg:h-[700px] relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-3xl order-1 lg:order-2 cursor-pointer group/lyrics", getBgThemeClass(), "text-white")}>
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20 pointer-events-none" />
-          
           {currentTrack ? (
             <div className="relative h-full flex flex-col">
               <div className="flex-1 overflow-hidden relative">
-                <div 
-                  ref={lyricScrollRef}
-                  className="h-full space-y-6 overflow-y-auto no-scrollbar pt-8 pb-[45%] px-6 md:px-12"
-                >
+                <div ref={lyricScrollRef} className="h-full space-y-6 overflow-y-auto no-scrollbar pt-4 pb-[45%] px-6 md:px-12">
                   {currentTrack.parsedLrc && currentTrack.parsedLrc.length > 0 ? (
                     currentTrack.parsedLrc.map((line, i) => (
-                      <div 
-                        key={i} 
-                        className={cn(
-                          getFontSizeClass(),
-                          "font-bold transition-all duration-300 transform break-words whitespace-pre-wrap leading-tight",
-                          i === activeLyricIndex 
-                            ? `${getActiveColorClass()} scale-105 origin-left opacity-100 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]` 
-                            : 'text-white/20 opacity-100'
-                        )}
-                      >
+                      <div key={i} className={cn(getFontSizeClass(), "font-bold transition-all duration-300 transform break-words whitespace-pre-wrap leading-tight", i === activeLyricIndex ? `${getActiveColorClass()} scale-105 origin-left opacity-100 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)]` : 'text-white/20 opacity-100')}>
                         {line.text}
                       </div>
                     ))
-                  ) : currentTrack.lyricsText ? (
+                  ) : (
                     <div className="text-center space-y-4 pt-10 px-4">
-                      {currentTrack.lyricsText.split('\n').map((line, i) => (
-                        <div key={i} className="text-lg md:text-xl font-medium text-white/40 break-words whitespace-pre-wrap">
-                          {line}
-                        </div>
+                      {currentTrack.lyricsText?.split('\n').map((line, i) => (
+                        <div key={i} className="text-lg md:text-xl font-medium text-white/40 break-words whitespace-pre-wrap">{line}</div>
                       ))}
                     </div>
-                  ) : null}
+                  )}
                 </div>
-                <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none" style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }} />
+                <div className="absolute top-0 left-0 right-0 h-12 pointer-events-none" style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }} />
                 <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none" style={{ background: `linear-gradient(to top, ${getThemeHex()}, transparent)` }} />
               </div>
             </div>
@@ -667,12 +567,6 @@ export default function LyricSyncApp() {
         </Card>
 
         <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md order-3">
-          <div className="p-3 border-b bg-muted/30">
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <Info className="w-3.5 h-3.5 text-primary" /> 正在播放
-            </h2>
-          </div>
-          
           <ScrollArea className="flex-1 p-5">
             <div className="space-y-6">
               {currentTrack ? (
@@ -681,9 +575,7 @@ export default function LyricSyncApp() {
                     <h2 className="text-lg font-bold font-headline mb-0.5 line-clamp-2 leading-tight">{currentTrack.title}</h2>
                     <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">已載入 AI 同步歌詞</p>
                   </div>
-
                   <Separator />
-
                   <div className="space-y-3">
                     <Slider value={[currentTime]} max={duration || 100} step={0.1} onValueChange={handleSeek} className="cursor-pointer h-4" />
                     <div className="flex justify-between text-[9px] font-mono text-muted-foreground">
@@ -691,30 +583,17 @@ export default function LyricSyncApp() {
                       <span>{formatTime(duration)}</span>
                     </div>
                   </div>
-
                   <div className="flex items-center justify-center gap-5">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => skipTrack('prev')}>
-                      <SkipBack className="w-5 h-5" />
-                    </Button>
-                    <Button 
-                      size="icon" 
-                      className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 shadow-xl shadow-primary/30"
-                      onClick={togglePlay}
-                    >
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => skipTrack('prev')}><SkipBack className="w-5 h-5" /></Button>
+                    <Button size="icon" className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 shadow-xl shadow-primary/30" onClick={togglePlay}>
                       {isPlaying ? <Pause className="w-7 h-7 fill-current" /> : <Play className="w-7 h-7 fill-current ml-1" />}
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => skipTrack('next')}>
-                      <SkipForward className="w-5 h-5" />
-                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => skipTrack('next')}><SkipForward className="w-5 h-5" /></Button>
                   </div>
-
                   <div className="flex items-center justify-center gap-2 text-[10px] font-bold text-muted-foreground opacity-60">
-                    <Repeat className="w-2.5 h-2.5 text-primary" />
-                    <span>連續播放模式</span>
+                    <Repeat className="w-2.5 h-2.5 text-primary" /> <span>連續播放模式</span>
                   </div>
-
                   <Separator />
-
                   <div className="space-y-5">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-[9px] text-muted-foreground font-bold uppercase">
@@ -723,7 +602,6 @@ export default function LyricSyncApp() {
                       </div>
                       <Slider value={[volume * 100]} max={100} onValueChange={(v) => setVolume(v[0] / 100)} className="h-4" />
                     </div>
-
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-[9px] text-muted-foreground font-bold uppercase">
                         <div className="flex items-center gap-1.5"><Timer className="w-3 h-3" /> 同步偏移</div>
@@ -733,10 +611,8 @@ export default function LyricSyncApp() {
                       </div>
                       <Slider value={[syncOffset]} min={-2} max={2} step={0.1} onValueChange={(v) => setSyncOffset(v[0])} className="h-4" />
                     </div>
-
                     <div className="space-y-4 pt-2">
-                      <p className="text-[9px] text-muted-foreground uppercase font-bold opacity-50">外觀</p>
-                      
+                      <p className="text-[9px] text-muted-foreground uppercase font-bold opacity-50">外觀設定</p>
                       <div className="grid grid-cols-1 gap-3">
                         <div className="space-y-1.5">
                           <Label className="text-[9px] flex items-center gap-1.5 uppercase opacity-60"><Type className="w-2.5 h-2.5" /> 字體</Label>
