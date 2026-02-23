@@ -3,3 +3,4 @@ config();
 
 import '@/ai/flows/correct-lyric-synchronization.ts';
 import '@/ai/flows/generate-lrc-from-mp3-and-lyrics.ts';
+import '@/ai/flows/transcribe-mp3-to-lrc.ts';

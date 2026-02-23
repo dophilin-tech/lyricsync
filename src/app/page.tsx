@@ -54,6 +54,7 @@ import {
 } from "@/components/ui/select";
 import { parseLrc, LrcLine, formatTime } from "@/lib/lrc-parser";
 import { generateLrcFromMp3AndLyrics } from "@/ai/flows/generate-lrc-from-mp3-and-lyrics";
+import { transcribeMp3ToLrc } from "@/ai/flows/transcribe-mp3-to-lrc";
 import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { Badge } from "@/components/ui/badge";
@@ -68,6 +69,7 @@ interface Track extends Omit<TrackData, 'mp3Blob'> {
 }
 
 export default function LyricSyncApp() {
+  // Hooks MUST be called unconditionally at the top
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -96,15 +98,9 @@ export default function LyricSyncApp() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lyricScrollRef = useRef<HTMLDivElement | null>(null);
 
-  const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
-
-  // Hooks MUST be called unconditionally at the top
   useEffect(() => {
     const isInIframe = window.self !== window.top;
     setIsIframe(isInIframe);
-    if (!isInIframe) {
-      setIsAppLaunched(true);
-    }
   }, []);
 
   const requestWakeLock = useCallback(async () => {
@@ -182,6 +178,7 @@ export default function LyricSyncApp() {
     if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
+  const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
   const adjustedCurrentTime = currentTime - syncOffset;
   const activeLyricIndex = currentTrack?.parsedLrc?.findLastIndex(l => l.time <= adjustedCurrentTime) ?? -1;
 
@@ -196,7 +193,6 @@ export default function LyricSyncApp() {
     }
   }, [activeLyricIndex, currentTime]);
 
-  // Conditional early return for iframe detection
   if (isIframe && !isAppLaunched) {
     return (
       <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
@@ -324,8 +320,8 @@ export default function LyricSyncApp() {
   };
 
   const handleFileUpload = async () => {
-    if (!newMp3File || !newLyricsText) {
-      toast({ title: "錯誤", description: "請選擇 MP3 並輸入歌詞。", variant: "destructive" });
+    if (!newMp3File) {
+      toast({ title: "錯誤", description: "請選擇 MP3 檔案。", variant: "destructive" });
       return;
     }
     setIsProcessing(true);
@@ -339,24 +335,41 @@ export default function LyricSyncApp() {
       const finalArtist = "未知歌手";
       let lrcContent = "";
       let parsedLrc: LrcLine[] = [];
-      try {
-        toast({ title: "同步中", description: "AI 正在分析音訊以對齊歌詞時間..." });
-        const aiRes = await generateLrcFromMp3AndLyrics({
+
+      if (!newLyricsText) {
+        // AI 自動聽寫模式
+        toast({ title: "AI 聽寫中", description: "偵測到無歌詞輸入，正在由 AI 自動從歌曲中聽寫歌詞並同步..." });
+        const aiRes = await transcribeMp3ToLrc({
           mp3DataUri,
-          lyricsText: newLyricsText,
           songTitle: finalTitle,
           artist: finalArtist
         });
         lrcContent = aiRes.lrcContent;
-        parsedLrc = parseLrc(lrcContent);
-        toast({ title: "成功", description: "AI 已完成歌詞同步！" });
-      } catch (err) {
-        toast({ title: "AI 錯誤", description: "同步失敗，將使用純文字歌詞。", variant: "destructive" });
+        toast({ title: "聽寫完成", description: "AI 已完成自動聽寫與同步！" });
+      } else {
+        // AI 同步模式
+        try {
+          toast({ title: "同步中", description: "AI 正在分析音訊以對齊歌詞時間..." });
+          const aiRes = await generateLrcFromMp3AndLyrics({
+            mp3DataUri,
+            lyricsText: newLyricsText,
+            songTitle: finalTitle,
+            artist: finalArtist
+          });
+          lrcContent = aiRes.lrcContent;
+          toast({ title: "同步成功", description: "AI 已完成歌詞同步！" });
+        } catch (err) {
+          lrcContent = ""; // Fallback
+          toast({ title: "同步失敗", description: "AI 同步發生錯誤，將使用純文字模式。", variant: "destructive" });
+        }
       }
+
+      parsedLrc = lrcContent ? parseLrc(lrcContent) : [];
+      
       const trackId = Date.now().toString();
       const trackData: TrackData = {
         id: trackId, title: finalTitle, artist: finalArtist,
-        mp3Blob: newMp3File, lyricsText: newLyricsText, lrcContent,
+        mp3Blob: newMp3File, lyricsText: newLyricsText || "AI 自動生成歌詞", lrcContent,
         createdAt: Date.now()
       };
       await saveTrackToDB(trackData);
@@ -418,7 +431,9 @@ export default function LyricSyncApp() {
                 <DialogContent className="sm:max-w-[450px]">
                   <DialogHeader>
                     <DialogTitle>新增歌曲</DialogTitle>
-                    <DialogDescription>請選擇 MP3 檔案，並輸入或選擇歌詞檔案。</DialogDescription>
+                    <DialogDescription>
+                      請選擇 MP3 檔案。歌詞為選填，若留空將由 AI 自動從歌曲中聽寫生成。
+                    </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
                     <div className="grid gap-2">
@@ -427,25 +442,27 @@ export default function LyricSyncApp() {
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="title" className="text-xs font-bold">2. 歌曲名稱 (選填)</Label>
-                      <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="例如：Bohemian Rhapsody" />
+                      <Input id="title" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="自動識別檔名..." />
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="lyrics-file" className="text-xs font-bold flex items-center gap-2">
-                        <FileText className="w-3 h-3" /> 3. 歌詞來源 (.txt)
+                        <FileText className="w-3 h-3" /> 3. 歌詞文字 (選填)
                       </Label>
-                      <Input id="lyrics-file" type="file" accept=".txt" onChange={handleLyricsFileChange} className="text-xs" />
+                      <div className="flex gap-2 mb-1">
+                        <Input id="lyrics-file" type="file" accept=".txt" onChange={handleLyricsFileChange} className="text-[10px] h-7 px-2" />
+                      </div>
                       <textarea 
                         id="lyrics" 
-                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className="flex min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         value={newLyricsText}
                         onChange={e => setNewLyricsText(e.target.value)}
-                        placeholder="或者在此處直接貼上歌詞內容..."
+                        placeholder="在此貼上歌詞... 或留空由 AI 自動聽寫"
                       />
                     </div>
                   </div>
                   <DialogFooter>
-                    <Button onClick={handleFileUpload} disabled={isProcessing || !newMp3File || !newLyricsText} className="w-full">
-                      {isProcessing ? "AI 同步中..." : "開始 AI 同步"}
+                    <Button onClick={handleFileUpload} disabled={isProcessing || !newMp3File} className="w-full">
+                      {isProcessing ? "AI 正在處理中..." : (newLyricsText ? "開始 AI 同步" : "開始 AI 自動聽寫")}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
