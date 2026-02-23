@@ -67,7 +67,6 @@ interface Track extends Omit<TrackData, 'mp3Blob'> {
 }
 
 export default function LyricSyncApp() {
-  // --- 1. All Hooks Must Be At The Top ---
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -97,7 +96,6 @@ export default function LyricSyncApp() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lyricScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Load settings from localStorage
   useEffect(() => {
     const savedFontSize = localStorage.getItem('lyricSync_fontSize');
     const savedActiveColor = localStorage.getItem('lyricSync_activeColor');
@@ -109,7 +107,6 @@ export default function LyricSyncApp() {
     setIsIframe(window.self !== window.top);
   }, []);
 
-  // Save settings to localStorage
   useEffect(() => {
     localStorage.setItem('lyricSync_fontSize', fontSize);
     localStorage.setItem('lyricSync_activeColor', activeColor);
@@ -193,33 +190,6 @@ export default function LyricSyncApp() {
     }
   }, [activeLyricIndex]);
 
-  // --- 2. Conditionals After All Hooks ---
-  if (isIframe && !isAppLaunched) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center text-primary-foreground shadow-2xl mb-6 animate-bounce">
-          <Music className="w-10 h-10" />
-        </div>
-        <h1 className="text-3xl font-bold text-white mb-2">LyricSync</h1>
-        <p className="text-slate-400 max-w-xs mb-10 text-sm">
-          偵測到您正在預覽環境中。請開啟獨立網頁以獲得完整的螢幕權限。
-        </p>
-        <Button 
-          size="lg" 
-          onClick={() => {
-            window.open(window.location.href, '_blank');
-            setIsAppLaunched(true);
-          }} 
-          className="h-14 px-10 text-lg font-bold gap-2 rounded-xl"
-        >
-          <Zap className="w-5 h-5 fill-current" />
-          立即啟動 App
-        </Button>
-      </div>
-    );
-  }
-
-  // --- 3. UI Helpers ---
   const getFontSizeClass = () => {
     switch (fontSize) {
       case 'sm': return 'text-xl md:text-2xl';
@@ -377,16 +347,39 @@ export default function LyricSyncApp() {
     }
   };
 
+  if (isIframe && !isAppLaunched) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center">
+        <div className="w-20 h-20 bg-primary rounded-3xl flex items-center justify-center text-primary-foreground shadow-2xl mb-6 animate-bounce">
+          <Music className="w-10 h-10" />
+        </div>
+        <h1 className="text-3xl font-bold text-white mb-2">LyricSync</h1>
+        <p className="text-slate-400 max-w-xs mb-10 text-sm">
+          偵測到您正在預覽環境中。請開啟獨立網頁以獲得完整的螢幕權限。
+        </p>
+        <Button 
+          size="lg" 
+          onClick={() => {
+            window.open(window.location.href, '_blank');
+            setIsAppLaunched(true);
+          }} 
+          className="h-14 px-10 text-lg font-bold gap-2 rounded-xl"
+        >
+          <Zap className="w-5 h-5 fill-current" />
+          立即啟動 App
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen bg-background flex flex-col p-0 overflow-hidden">
-      {/* Top Header */}
       <header className="flex justify-between items-center h-10 px-4 z-10 bg-background/80 backdrop-blur-sm shrink-0 border-b">
         <div className="flex items-center gap-2">
           <Music className="w-4 h-4 text-primary" />
           <h1 className="text-sm font-bold tracking-tight text-primary">LyricSync</h1>
         </div>
         <div className="flex items-center gap-1.5">
-          {/* Add Track */}
           <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -428,7 +421,6 @@ export default function LyricSyncApp() {
             </DialogContent>
           </Dialog>
 
-          {/* Settings */}
           <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -499,20 +491,20 @@ export default function LyricSyncApp() {
         </div>
       </header>
 
-      {/* Main Body */}
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        
-        {/* Lyrics Area - Mobile: 75% height */}
         <Card 
-          onDoubleClick={togglePlay}
           className={cn(
-            "flex-[3] lg:flex-[6] relative flex flex-col overflow-hidden border-none transition-colors duration-500 rounded-none cursor-pointer",
+            "flex-[3] lg:flex-[6] relative flex flex-col overflow-hidden border-none transition-colors duration-500 rounded-none",
             getBgThemeClass()
           )}
         >
           {currentTrack ? (
             <div className="relative h-full flex flex-col">
-              <div ref={lyricScrollRef} className="flex-1 overflow-y-auto no-scrollbar pt-[8%] pb-[30%] px-6">
+              <div 
+                ref={lyricScrollRef} 
+                onDoubleClick={togglePlay}
+                className="flex-1 overflow-y-auto no-scrollbar pt-[8%] pb-12 px-6 cursor-pointer"
+              >
                 {currentTrack.parsedLrc?.map((line, i) => (
                   <div 
                     key={i} 
@@ -529,20 +521,20 @@ export default function LyricSyncApp() {
                 ))}
               </div>
 
-              {/* Mobile Playback Overlay */}
-              <div className="absolute bottom-4 left-0 right-0 px-4 flex justify-between items-center pointer-events-none">
-                 <div className="flex items-center gap-3 pointer-events-auto bg-black/40 backdrop-blur rounded-full px-4 py-2 border border-white/10">
-                   <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={(e) => { e.stopPropagation(); skipTrack('prev'); }}>
+              {/* Mobile Playback Controls - Integrated Bottom Bar to avoid blocking lyrics */}
+              <div className="shrink-0 bg-black/40 backdrop-blur-md px-4 py-2 flex justify-between items-center border-t border-white/10">
+                 <div className="flex items-center gap-3">
+                   <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={() => skipTrack('prev')}>
                      <SkipBack className="w-4 h-4" />
                    </Button>
-                   <Button size="icon" className="h-10 w-10 rounded-full bg-white text-black hover:bg-white/90" onClick={(e) => { e.stopPropagation(); togglePlay(); }}>
+                   <Button size="icon" className="h-10 w-10 rounded-full bg-white text-black hover:bg-white/90" onClick={togglePlay}>
                      {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
                    </Button>
-                   <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={(e) => { e.stopPropagation(); skipTrack('next'); }}>
+                   <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={() => skipTrack('next')}>
                      <SkipForward className="w-4 h-4" />
                    </Button>
                  </div>
-                 <div className="pointer-events-auto bg-black/40 backdrop-blur rounded-full px-3 py-2 border border-white/10 text-[10px] font-mono text-white/80">
+                 <div className="bg-white/10 rounded-full px-3 py-1.5 text-[10px] font-mono text-white/90">
                    {formatTime(currentTime)} / {formatTime(duration)}
                  </div>
               </div>
@@ -556,7 +548,6 @@ export default function LyricSyncApp() {
           )}
         </Card>
 
-        {/* Playlist Area - Mobile: 25% height */}
         <Card className="flex-[1] lg:flex-[3] flex flex-col overflow-hidden border-none shadow-lg bg-card/50 backdrop-blur-md rounded-none">
           <div className="p-2 border-b flex items-center justify-between bg-muted/30 shrink-0">
              <h2 className="text-[10px] font-bold flex items-center gap-1 uppercase tracking-wider">
@@ -587,7 +578,6 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
-        {/* Desktop Detail Controls */}
         <Card className="hidden lg:flex lg:flex-[3] flex-col border-none shadow-lg bg-card/80 backdrop-blur-md p-4 space-y-6">
           {currentTrack ? (
             <>
