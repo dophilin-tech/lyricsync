@@ -96,6 +96,7 @@ export default function LyricSyncApp() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lyricScrollRef = useRef<HTMLDivElement | null>(null);
 
+  // 1. Initial State Load
   useEffect(() => {
     const savedFontSize = localStorage.getItem('lyricSync_fontSize');
     const savedActiveColor = localStorage.getItem('lyricSync_activeColor');
@@ -107,6 +108,7 @@ export default function LyricSyncApp() {
     setIsIframe(window.self !== window.top);
   }, []);
 
+  // 2. Persistence Sync
   useEffect(() => {
     localStorage.setItem('lyricSync_fontSize', fontSize);
     localStorage.setItem('lyricSync_activeColor', activeColor);
@@ -124,6 +126,7 @@ export default function LyricSyncApp() {
     }
   }, [wakeLock]);
 
+  // 3. Wake Lock Management
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && isPlaying) await requestWakeLock();
@@ -141,12 +144,14 @@ export default function LyricSyncApp() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isPlaying, requestWakeLock, wakeLock]);
 
+  // 4. Fullscreen State
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // 5. DB Load
   useEffect(() => {
     const loadTracks = async () => {
       try {
@@ -175,14 +180,17 @@ export default function LyricSyncApp() {
     loadTracks();
   }, []);
 
+  // 6. Volume Effect
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
+  // Current State Derived
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
   const adjustedCurrentTime = currentTime - syncOffset;
   const activeLyricIndex = currentTrack?.parsedLrc?.findLastIndex(l => l.time <= adjustedCurrentTime) ?? -1;
 
+  // 7. Lyric Auto-Scroll
   useEffect(() => {
     if (lyricScrollRef.current && activeLyricIndex !== -1) {
       const activeEl = lyricScrollRef.current.children[activeLyricIndex] as HTMLElement;
