@@ -13,13 +13,11 @@ import {
   Trash2,
   ListMusic,
   Timer,
-  Info,
   Type,
   Palette,
   Maximize,
   Minimize,
   Repeat,
-  ExternalLink,
   Zap,
   FileText
 } from "lucide-react";
@@ -101,6 +99,7 @@ export default function LyricSyncApp() {
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
+  // Hook 1: 環境偵測
   useEffect(() => {
     const isInIframe = window.self !== window.top;
     setIsIframe(isInIframe);
@@ -109,6 +108,7 @@ export default function LyricSyncApp() {
     }
   }, []);
 
+  // Hook 2: Wake Lock 請求函數
   const requestWakeLock = useCallback(async () => {
     if (!('wakeLock' in navigator)) return;
     try {
@@ -121,16 +121,10 @@ export default function LyricSyncApp() {
       lock.addEventListener('release', () => setWakeLock(null));
     } catch (err: any) {
       setWakeLock(null);
-      if (err.name === 'NotAllowedError') {
-        toast({
-          title: "螢幕常亮功能受限",
-          description: isIframe ? "偵測到預覽環境限制，請開啟獨立網頁。" : "瀏覽器封鎖了此功能，請確認 HTTPS 或手機電量。",
-          variant: "destructive"
-        });
-      }
     }
-  }, [wakeLock, isIframe]);
+  }, [wakeLock]);
 
+  // Hook 3: 自動喚醒鎖定
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && isPlaying) {
@@ -153,12 +147,14 @@ export default function LyricSyncApp() {
     };
   }, [isPlaying, requestWakeLock]);
 
+  // Hook 4: 全螢幕監聽
   useEffect(() => {
     const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Hook 5: 載入資料庫
   useEffect(() => {
     const loadTracks = async () => {
       try {
@@ -187,10 +183,28 @@ export default function LyricSyncApp() {
     loadTracks();
   }, []);
 
+  // Hook 6: 音量更新
   useEffect(() => {
     if (audioRef.current) audioRef.current.volume = volume;
   }, [volume]);
 
+  // 計算變數 (非 Hook)
+  const adjustedCurrentTime = currentTime - syncOffset;
+  const activeLyricIndex = currentTrack?.parsedLrc?.findLastIndex(l => l.time <= adjustedCurrentTime) ?? -1;
+
+  // Hook 7: 歌詞捲動 (必須放在早前回傳之前)
+  useEffect(() => {
+    if (lyricScrollRef.current) {
+      if (activeLyricIndex !== -1) {
+        const activeEl = lyricScrollRef.current.children[activeLyricIndex] as HTMLElement;
+        if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if (currentTime === 0) {
+        lyricScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }, [activeLyricIndex, currentTime]);
+
+  // 功能函數
   const toggleFullscreen = (force?: boolean) => {
     if (force === true || !document.fullscreenElement) {
       if (!document.fullscreenElement) {
@@ -231,32 +245,12 @@ export default function LyricSyncApp() {
     }
   };
 
-  const handleTimeUpdate = () => {
-    if (audioRef.current) setCurrentTime(audioRef.current.currentTime);
-  };
-
-  const handleLoadedMetadata = () => {
-    if (audioRef.current) setDuration(audioRef.current.duration);
-  };
-
-  const handleSeek = (value: number[]) => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = value[0];
-      setCurrentTime(value[0]);
-    }
-  };
-
   const skipTrack = (direction: 'next' | 'prev') => {
     if (playlist.length === 0) return;
     let nextIndex = direction === 'next' ? currentTrackIndex + 1 : currentTrackIndex - 1;
     if (nextIndex >= playlist.length) nextIndex = 0;
     if (nextIndex < 0) nextIndex = playlist.length - 1;
     playTrack(nextIndex);
-  };
-
-  const handleTrackEnded = () => {
-    if (playlist.length > 0) skipTrack('next');
-    else setIsPlaying(false);
   };
 
   const handleLyricsFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -277,7 +271,6 @@ export default function LyricSyncApp() {
     }
     setIsProcessing(true);
     try {
-      const audioUrl = URL.createObjectURL(newMp3File);
       const reader = new FileReader();
       const mp3DataUri = await new Promise<string>((resolve) => {
         reader.onload = () => resolve(reader.result as string);
@@ -299,7 +292,6 @@ export default function LyricSyncApp() {
         parsedLrc = parseLrc(lrcContent);
         toast({ title: "成功", description: "AI 已完成歌詞同步！" });
       } catch (err) {
-        console.warn(err);
         toast({ title: "AI 錯誤", description: "同步失敗，將使用純文字歌詞。", variant: "destructive" });
       }
       const trackId = Date.now().toString();
@@ -309,42 +301,20 @@ export default function LyricSyncApp() {
         createdAt: Date.now()
       };
       await saveTrackToDB(trackData);
+      const audioUrl = URL.createObjectURL(newMp3File);
       const newTrack: Track = { ...trackData, audioUrl, mp3DataUri, parsedLrc };
       const newPlaylist = [...playlist, newTrack];
       setPlaylist(newPlaylist);
       if (currentTrackIndex === -1) playTrack(newPlaylist.length - 1);
       setNewTitle(""); setNewMp3File(null); setNewLyricsText(""); setIsUploadOpen(false);
     } catch (error) {
-      console.warn(error);
       toast({ title: "上傳失敗", description: "處理檔案時發生錯誤。", variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const confirmDelete = async () => {
-    if (!trackToDelete) return;
-    try {
-      await deleteTrackFromDB(trackToDelete);
-      const indexToRemove = playlist.findIndex(t => t.id === trackToDelete);
-      const newPlaylist = playlist.filter(t => t.id !== trackToDelete);
-      setPlaylist(newPlaylist);
-      if (currentTrackIndex === indexToRemove) {
-        setCurrentTrackIndex(-1);
-        setIsPlaying(false);
-      } else if (currentTrackIndex > indexToRemove) {
-        setCurrentTrackIndex(currentTrackIndex - 1);
-      }
-      toast({ title: "已刪除", description: "歌曲已從裝置儲存中移除。" });
-    } catch (error) {
-      console.warn(error);
-    } finally {
-      setTrackToDelete(null);
-    }
-  };
-
-  const openInNewTab = () => window.open(window.location.href, '_blank');
-
+  // UI 樣式輔助
   const getFontSizeClass = () => {
     switch (fontSize) {
       case 'sm': return 'text-xl md:text-2xl';
@@ -389,6 +359,7 @@ export default function LyricSyncApp() {
     }
   };
 
+  // 早前回傳 (用於 iframe 跳轉提示) - 必須放在所有 Hook 之後
   if (isIframe && !isAppLaunched) {
     return (
       <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
@@ -401,7 +372,7 @@ export default function LyricSyncApp() {
         </p>
         <Button 
           size="lg" 
-          onClick={() => { openInNewTab(); setIsAppLaunched(true); }}
+          onClick={() => { window.open(window.location.href, '_blank'); setIsAppLaunched(true); }}
           className="h-16 px-12 text-xl font-bold gap-3 rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-transform"
         >
           <Zap className="w-6 h-6 fill-current" />
@@ -411,20 +382,7 @@ export default function LyricSyncApp() {
     );
   }
 
-  const adjustedCurrentTime = currentTime - syncOffset;
-  const activeLyricIndex = currentTrack?.parsedLrc?.findLastIndex(l => l.time <= adjustedCurrentTime) ?? -1;
-
-  useEffect(() => {
-    if (lyricScrollRef.current) {
-      if (activeLyricIndex !== -1) {
-        const activeEl = lyricScrollRef.current.children[activeLyricIndex] as HTMLElement;
-        if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      } else if (currentTime === 0) {
-        lyricScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    }
-  }, [activeLyricIndex, currentTime]);
-
+  // 主要介面回傳
   return (
     <div className="min-h-screen bg-background flex flex-col items-center p-0 md:p-8">
       <header className="w-full max-w-7xl flex justify-between items-center py-2 px-4">
@@ -443,6 +401,7 @@ export default function LyricSyncApp() {
       </header>
 
       <main className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 items-stretch p-2">
+        {/* 播放清單卡片 */}
         <Card className="lg:col-span-3 h-full flex flex-col overflow-hidden border-none shadow-xl bg-card/50 backdrop-blur order-2 lg:order-1">
           <div className="p-3 border-b flex flex-col gap-3 bg-muted/30">
             <div className="flex items-center justify-between">
@@ -532,6 +491,7 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
+        {/* 歌詞顯示卡片 */}
         <Card onClick={togglePlay} className={cn("lg:col-span-6 h-[500px] lg:h-[700px] relative overflow-hidden border-none shadow-2xl transition-colors duration-500 rounded-3xl order-1 lg:order-2 cursor-pointer group/lyrics", getBgThemeClass(), "text-white")}>
           <div className="absolute inset-0 bg-gradient-to-br from-white/5 via-transparent to-black/20 pointer-events-none" />
           {currentTrack ? (
@@ -566,6 +526,7 @@ export default function LyricSyncApp() {
           )}
         </Card>
 
+        {/* 控制面板卡片 */}
         <Card className="lg:col-span-3 h-full flex flex-col border-none shadow-xl bg-card/80 backdrop-blur-md order-3">
           <ScrollArea className="flex-1 p-5">
             <div className="space-y-6">
@@ -577,7 +538,7 @@ export default function LyricSyncApp() {
                   </div>
                   <Separator />
                   <div className="space-y-3">
-                    <Slider value={[currentTime]} max={duration || 100} step={0.1} onValueChange={handleSeek} className="cursor-pointer h-4" />
+                    <Slider value={[currentTime]} max={duration || 100} step={0.1} onValueChange={(v) => { if (audioRef.current) audioRef.current.currentTime = v[0]; }} className="cursor-pointer h-4" />
                     <div className="flex justify-between text-[9px] font-mono text-muted-foreground">
                       <span>{formatTime(currentTime)}</span>
                       <span>{formatTime(duration)}</span>
@@ -652,16 +613,23 @@ export default function LyricSyncApp() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground">確認刪除</AlertDialogAction>
+            <AlertDialogAction onClick={async () => {
+              if (trackToDelete) {
+                await deleteTrackFromDB(trackToDelete);
+                setPlaylist(playlist.filter(t => t.id !== trackToDelete));
+                setTrackToDelete(null);
+                toast({ title: "已刪除", description: "歌曲已移除。" });
+              }
+            }} className="bg-destructive text-destructive-foreground">確認刪除</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <audio 
         ref={audioRef}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
-        onEnded={handleTrackEnded}
+        onTimeUpdate={() => audioRef.current && setCurrentTime(audioRef.current.currentTime)}
+        onLoadedMetadata={() => audioRef.current && setDuration(audioRef.current.duration)}
+        onEnded={() => skipTrack('next')}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
       />
