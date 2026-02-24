@@ -22,22 +22,17 @@
 ### 2. 開發與部署端 (Firebase CLI)
 - **環境**：需安裝 Node.js 18.x 或以上版本。
 - **記憶體**：執行部署前的建置 (`npm run build`) 建議電腦具備 8GB RAM。
-- **工具**：Firebase CLI (透過 npm 安裝)。
-
-## 部署至 Firebase Hosting (電腦端操作)
-為了讓您的朋友能透過網址直接使用，建議將 App 部署到 Firebase：
-
-1. **安裝 Firebase CLI**：在電腦開啟終端機執行 `npm install -g firebase-tools`。
-2. **登入**：執行 `firebase login` 並選取專案。
-3. **部署**：
-   - 推薦使用 **Firebase App Hosting**。連結您的 GitHub 儲存庫後，Firebase 會自動處理所有建置與更新。
-   - 傳統方式：執行 `npm run build` 後執行 `firebase deploy`。
 
 ## 如何將 APK 分享給他人？
-1. **產出 APK**：
-   - 在電腦執行 `npm run cap:open:android` 開啟 Android Studio。
+1. **本地編譯 (Android Studio)**：
+   - 執行 `npm run cap:open:android` 開啟 Android Studio。
    - 選擇 **Build > Build APK(s)**。
-2. **分享檔案**：
-   - 找到產出的 `app-debug.apk` 並分享給朋友（可透過雲端硬碟或通訊軟體）。
+2. **雲端編譯 (免安裝環境)**：
+   - 使用 **Ionic Appflow**：Capacitor 官方雲端服務。
+   - 使用 **GitHub Actions**：設定 CI/CD 自動化打包腳本。
 3. **安裝提示**：
    - 提醒對方需「允許安裝來自未知來源的應用程式」。
+
+## 部署至 Firebase Hosting
+1. **安裝 CLI**：`npm install -g firebase-tools` (僅限電腦)。
+2. **部署**：建議使用 **Firebase App Hosting** 連結 GitHub 實現自動化部署。
