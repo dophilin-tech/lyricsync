@@ -23,7 +23,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Card } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Dialog, 
   DialogContent, 
@@ -94,6 +93,7 @@ export default function LyricSyncApp() {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lyricScrollRef = useRef<HTMLDivElement | null>(null);
+  const playlistContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const inIframe = window.self !== window.top;
@@ -186,6 +186,16 @@ export default function LyricSyncApp() {
       if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [activeLyricIndex]);
+
+  // 自動滾動歌單至中間
+  useEffect(() => {
+    if (playlistContainerRef.current && currentTrackIndex !== -1) {
+      const activeItem = playlistContainerRef.current.children[currentTrackIndex] as HTMLElement;
+      if (activeItem) {
+        activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [currentTrackIndex]);
 
   const playTrack = async (index: number) => {
     if (index < 0 || index >= playlist.length || !audioRef.current) return;
@@ -477,9 +487,10 @@ export default function LyricSyncApp() {
       </header>
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        {/* 歌詞區域 - 佔 75% 高度 */}
         <Card 
           className={cn(
-            "flex-[3] lg:flex-[6] relative flex flex-col overflow-hidden border-none transition-colors duration-500 rounded-none",
+            "flex-[3] lg:flex-[6] relative flex flex-col overflow-hidden border-none transition-colors duration-500 rounded-none h-3/4 lg:h-full",
             getBgThemeClass()
           )}
         >
@@ -488,7 +499,7 @@ export default function LyricSyncApp() {
               <div 
                 ref={lyricScrollRef} 
                 onDoubleClick={togglePlay}
-                className="flex-1 overflow-y-auto no-scrollbar pt-[5%] pb-12 px-6 cursor-pointer"
+                className="flex-1 overflow-y-auto no-scrollbar pt-[10%] pb-24 px-6 cursor-pointer"
               >
                 {currentTrack.parsedLrc?.map((line, i) => (
                   <div 
@@ -506,19 +517,20 @@ export default function LyricSyncApp() {
                 ))}
               </div>
 
-              <div className="shrink-0 bg-black/40 backdrop-blur-md px-4 py-2 flex justify-between items-center border-t border-white/10">
-                 <div className="flex items-center gap-3">
-                   <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={() => skipTrack('prev')}>
-                     <SkipBack className="w-4 h-4" />
+              {/* 播放控制項 - 獨立底部區塊，不擋歌詞 */}
+              <div className="shrink-0 bg-black/60 backdrop-blur-md px-4 py-3 flex justify-between items-center border-t border-white/10 z-20">
+                 <div className="flex items-center gap-4">
+                   <Button variant="ghost" size="icon" className="h-10 w-10 text-white" onClick={() => skipTrack('prev')}>
+                     <SkipBack className="w-5 h-5" />
                    </Button>
-                   <Button size="icon" className="h-10 w-10 rounded-full bg-white text-black hover:bg-white/90" onClick={togglePlay}>
-                     {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current ml-0.5" />}
+                   <Button size="icon" className="h-12 w-12 rounded-full bg-white text-black hover:bg-white/90" onClick={togglePlay}>
+                     {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}
                    </Button>
-                   <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={() => skipTrack('next')}>
-                     <SkipForward className="w-4 h-4" />
+                   <Button variant="ghost" size="icon" className="h-10 w-10 text-white" onClick={() => skipTrack('next')}>
+                     <SkipForward className="w-5 h-5" />
                    </Button>
                  </div>
-                 <div className="bg-white/10 rounded-full px-3 py-1.5 text-[10px] font-mono text-white/90">
+                 <div className="bg-white/10 rounded-full px-4 py-2 text-xs font-mono text-white/90">
                    {formatTime(currentTime)} / {formatTime(duration)}
                  </div>
               </div>
@@ -531,36 +543,58 @@ export default function LyricSyncApp() {
           )}
         </Card>
 
-        <Card className="flex-[1] lg:flex-[3] flex flex-col overflow-hidden border-none shadow-lg bg-card/50 backdrop-blur-md rounded-none">
+        {/* 播放清單區域 - 佔 25% 高度，可獨立滾動且正在播放的置中 */}
+        <Card className="flex-[1] lg:flex-[3] flex flex-col overflow-hidden border-none shadow-lg bg-card/50 backdrop-blur-md rounded-none h-1/4 lg:h-full">
           <div className="p-2 border-b flex items-center justify-between bg-muted/30 shrink-0">
              <h2 className="text-[10px] font-bold flex items-center gap-1 uppercase tracking-wider">
                <ListMusic className="w-3 h-3 text-primary" /> 播放清單
              </h2>
              <span className="text-[9px] text-muted-foreground font-bold">{playlist.length} 首</span>
           </div>
-          <ScrollArea className="flex-1">
+          <div 
+            ref={playlistContainerRef}
+            className="flex-1 overflow-y-auto no-scrollbar"
+          >
             {playlist.map((track, index) => (
               <div 
                 key={track.id} 
                 onClick={() => playTrack(index)}
                 className={cn(
-                  "group p-3 flex items-center gap-3 cursor-pointer border-b transition-colors",
-                  index === currentTrackIndex ? 'bg-primary/10 border-l-4 border-l-primary' : 'hover:bg-muted/50'
+                  "group h-[60px] p-3 flex items-center gap-3 cursor-pointer border-b transition-colors",
+                  index === currentTrackIndex ? 'bg-primary/20 border-l-4 border-l-primary' : 'hover:bg-muted/50'
                 )}
               >
-                <div className="w-6 h-6 bg-primary/20 rounded flex items-center justify-center shrink-0 text-primary">
-                  {index === currentTrackIndex && isPlaying ? "•" : <Music className="w-3 h-3" />}
+                <div className="w-8 h-8 bg-primary/20 rounded flex items-center justify-center shrink-0 text-primary">
+                  {index === currentTrackIndex && isPlaying ? "▶" : <Music className="w-4 h-4" />}
                 </div>
-                <span className="text-xs font-medium truncate flex-1">{track.title}</span>
-                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 text-destructive" onClick={(e) => { e.stopPropagation(); setTrackToDelete(track.id); }}>
-                  <Trash2 className="w-3.5 h-3.5" />
+                {/* 正在播放的歌名放在中間 (置中) */}
+                <div className={cn(
+                  "flex-1 flex flex-col min-w-0",
+                  index === currentTrackIndex ? "items-center text-center" : "items-start"
+                )}>
+                  <span className={cn(
+                    "text-xs truncate w-full",
+                    index === currentTrackIndex ? "font-bold text-primary" : "font-medium"
+                  )}>
+                    {track.title}
+                  </span>
+                  {index === currentTrackIndex && <span className="text-[8px] uppercase tracking-tighter opacity-50">NOW PLAYING</span>}
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-8 w-8 opacity-0 group-hover:opacity-100 text-destructive" 
+                  onClick={(e) => { e.stopPropagation(); setTrackToDelete(track.id); }}
+                >
+                  <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
             ))}
             {playlist.length === 0 && <div className="p-10 text-center opacity-20 text-[10px]">清單為空</div>}
-          </ScrollArea>
+          </div>
         </Card>
 
+        {/* 桌面版專用的播放詳情控制 */}
         <Card className="hidden lg:flex lg:flex-[3] flex-col border-none shadow-lg bg-card/80 backdrop-blur-md p-4 space-y-6">
           {currentTrack ? (
             <>
