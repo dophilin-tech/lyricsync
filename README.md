@@ -11,12 +11,13 @@
 - **AI 聽寫與同步**：上傳時若無歌詞，AI 自動聽寫產生同步 LRC。
 - **原生環境優化**：打包 APK 後啟動自動隱藏偵測畫面，直接進入主介面。
 
-## 專案路徑與執行說明
-當您在電腦上執行 `firebase deploy` 或 `npm run build` 時，請確保您的終端機 (Terminal/CMD) 位在 **專案根目錄**。
-- **根目錄特徵**：資料夾內包含 `package.json`、`apphosting.yaml` 與 `src` 資料夾。
-- **如何確認路徑**：
-  - Windows: 在檔案總管網址列輸入 `cmd` 並按 Enter。
-  - Mac/Linux: 在資料夾上點擊右鍵選擇「在終端機開啟」。
+## 如何找到您的「專案根目錄」？
+「專案根目錄」是指包含本專案核心配置檔案的資料夾。當您執行 `npm`、`git` 或 `firebase` 指令時，必須位於此路徑下。
+- **特徵**：此資料夾內包含 `package.json`、`apphosting.yaml` 與 `src` 資料夾。
+- **快速定位**：
+  - **Windows**: 在該資料夾的網址列輸入 `cmd` 並按 Enter，跳出的黑視窗即位於根目錄。
+  - **Mac/Linux**: 在資料夾上點擊右鍵選擇「在終端機開啟」。
+  - **驗證指令**: 輸入 `ls` (Mac) 或 `dir` (Windows)，若看到 `package.json` 則代表路徑正確。
 
 ## 硬體要求 (Hardware Requirements)
 
@@ -29,6 +30,7 @@
 ### 2. 開發與部署端 (Firebase CLI / Build)
 - **環境**：需安裝 Node.js 18.x 或以上版本。
 - **記憶體**：執行建置 (`npm run build`) 建議電腦具備 **8GB RAM**。
+- **Firebase CLI**: 是一個輕量工具，只要能執行 Node.js 即可。
 
 ## 如何將程式碼上傳至 GitHub？
 1. **建立 GitHub 儲存庫**：登入 GitHub，建立一個全新的 Repository。
