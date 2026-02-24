@@ -187,7 +187,7 @@ export default function LyricSyncApp() {
     }
   }, [activeLyricIndex]);
 
-  // 自動滾動歌單至中間
+  // 1.0.1 重點：歌單自動捲動至中間
   useEffect(() => {
     if (playlistContainerRef.current && currentTrackIndex !== -1) {
       const activeItem = playlistContainerRef.current.children[currentTrackIndex] as HTMLElement;
@@ -487,7 +487,7 @@ export default function LyricSyncApp() {
       </header>
 
       <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* 歌詞區域 - 佔 75% 高度 */}
+        {/* 歌詞區域 - 75% 高度 */}
         <Card 
           className={cn(
             "flex-[3] lg:flex-[6] relative flex flex-col overflow-hidden border-none transition-colors duration-500 rounded-none h-3/4 lg:h-full",
@@ -543,7 +543,7 @@ export default function LyricSyncApp() {
           )}
         </Card>
 
-        {/* 播放清單區域 - 佔 25% 高度，可獨立滾動且正在播放的置中 */}
+        {/* 播放清單區域 - 25% 高度，播放中置中 */}
         <Card className="flex-[1] lg:flex-[3] flex flex-col overflow-hidden border-none shadow-lg bg-card/50 backdrop-blur-md rounded-none h-1/4 lg:h-full">
           <div className="p-2 border-b flex items-center justify-between bg-muted/30 shrink-0">
              <h2 className="text-[10px] font-bold flex items-center gap-1 uppercase tracking-wider">
@@ -567,7 +567,7 @@ export default function LyricSyncApp() {
                 <div className="w-8 h-8 bg-primary/20 rounded flex items-center justify-center shrink-0 text-primary">
                   {index === currentTrackIndex && isPlaying ? "▶" : <Music className="w-4 h-4" />}
                 </div>
-                {/* 正在播放的歌名放在中間 (置中) */}
+                {/* 1.0.1 重點：播放中歌名置中 */}
                 <div className={cn(
                   "flex-1 flex flex-col min-w-0",
                   index === currentTrackIndex ? "items-center text-center" : "items-start"
@@ -578,7 +578,7 @@ export default function LyricSyncApp() {
                   )}>
                     {track.title}
                   </span>
-                  {index === currentTrackIndex && <span className="text-[8px] uppercase tracking-tighter opacity-50">NOW PLAYING</span>}
+                  {index === currentTrackIndex && <span className="text-[8px] uppercase tracking-tighter opacity-50">正在播放</span>}
                 </div>
                 <Button 
                   variant="ghost" 
