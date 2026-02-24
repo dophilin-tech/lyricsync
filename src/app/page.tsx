@@ -20,7 +20,8 @@ import {
   Layout,
   Zap,
   Cpu,
-  Info
+  Info,
+  Globe
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -488,21 +489,21 @@ export default function LyricSyncApp() {
                     <Cpu className="w-4 h-4" />
                     <span className="text-xs font-bold uppercase tracking-wider">硬體要求 (系統建議)</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 text-[10px] bg-muted/30 p-3 rounded-lg border border-border/50">
+                  <div className="grid grid-cols-2 gap-3 text-[10px] bg-muted/30 p-3 rounded-lg border border-border/50">
                     <div className="space-y-1">
-                      <p className="font-bold opacity-60">處理器</p>
+                      <p className="font-bold opacity-60 flex items-center gap-1"><Cpu className="w-2 h-2" /> 處理器</p>
                       <p>雙核心以上</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="font-bold opacity-60">記憶體</p>
-                      <p>至少 2GB RAM</p>
+                      <p className="font-bold opacity-60 flex items-center gap-1"><Info className="w-2 h-2" /> 記憶體</p>
+                      <p>2GB - 4GB RAM</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="font-bold opacity-60">連線</p>
-                      <p>AI 功能需網路</p>
+                      <p className="font-bold opacity-60 flex items-center gap-1"><Globe className="w-2 h-2" /> Firebase CLI</p>
+                      <p>Node 18+, 8GB RAM</p>
                     </div>
                     <div className="space-y-1">
-                      <p className="font-bold opacity-60">系統</p>
+                      <p className="font-bold opacity-60 flex items-center gap-1"><Info className="w-2 h-2" /> 系統</p>
                       <p>Android 8.0+</p>
                     </div>
                   </div>
