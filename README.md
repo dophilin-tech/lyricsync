@@ -5,7 +5,7 @@
 
 ## 核心功能 (1.0.1)
 - **智慧捲動歌單**：在手機版播放時，下方歌單會自動捲動，將當前歌曲保持在視覺中間位置。
-- **播歌視覺優化**：正在播放的歌曲名稱改為居中顯示。
+- **播歌視覺優化**：正在播放的歌曲名稱改為居中顯示，方便一眼辨認。
 - **雙擊手勢**：在歌詞區域「雙擊」即可快速切換播放/暫停。
 - **介面個人化記憶**：系統自動儲存「字體大小」、「歌詞顏色」、「背景主題」。
 - **AI 聽寫與同步**：上傳時若無歌詞，AI 自動聽寫產生同步 LRC。
@@ -21,18 +21,28 @@
 
 ### 2. 開發與部署端 (Firebase CLI)
 - **環境**：需安裝 Node.js 18.x 或以上版本。
-- **記憶體**：執行部署前的建置 (`npm run build`) 建議電腦具備 8GB RAM。
+- **記憶體**：建置 (`npm run build`) 建議電腦具備 8GB RAM。
+
+## 如何將程式碼上傳至 GitHub？
+1. **建立 GitHub 儲存庫**：登入 GitHub，點擊 **New repository**，輸入名稱（如 `lyricsync`），不要勾選初始化選項（README/License）。
+2. **安裝 Git**：確保電腦已安裝 Git 工具。
+3. **執行指令**：在專案根目錄執行：
+   ```bash
+   git init
+   git add .
+   git commit -m "LyricSync 1.0.1 Stable"
+   git branch -M main
+   git remote add origin [您的GitHub網址]
+   git push -u origin main
+   ```
 
 ## 如何將 APK 分享給他人？
 1. **本地編譯 (Android Studio)**：
-   - 執行 `npm run cap:open:android` 開啟 Android Studio。
+   - 執行 `npm run cap:open:android`。
    - 選擇 **Build > Build APK(s)**。
 2. **雲端編譯 (免安裝環境)**：
-   - 使用 **Ionic Appflow**：Capacitor 官方雲端服務。
-   - 使用 **GitHub Actions**：設定 CI/CD 自動化打包腳本。
-3. **安裝提示**：
-   - 提醒對方需「允許安裝來自未知來源的應用程式」。
+   - 使用 **Ionic Appflow** 或 **GitHub Actions** 連結 GitHub 實現自動化打包。
+3. **安裝提示**：提醒對方需「允許安裝來自未知來源的應用程式」。
 
 ## 部署至 Firebase Hosting
-1. **安裝 CLI**：`npm install -g firebase-tools` (僅限電腦)。
-2. **部署**：建議使用 **Firebase App Hosting** 連結 GitHub 實現自動化部署。
+- 建議使用 **Firebase App Hosting** 連結 GitHub，實現每次推送代碼後自動更新網站。
