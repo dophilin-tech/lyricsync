@@ -18,7 +18,9 @@ import {
   Settings,
   FileText,
   Layout,
-  Zap
+  Zap,
+  Cpu,
+  Info
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -51,6 +53,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { parseLrc, LrcLine, formatTime } from "@/lib/lrc-parser";
 import { generateLrcFromMp3AndLyrics } from "@/ai/flows/generate-lrc-from-mp3-and-lyrics";
 import { transcribeMp3ToLrc } from "@/ai/flows/transcribe-mp3-to-lrc";
@@ -423,57 +426,86 @@ export default function LyricSyncApp() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[350px]">
               <DialogHeader>
-                <DialogTitle>介面設定</DialogTitle>
-                <DialogDescription>系統將自動記住您的個人化設定。</DialogDescription>
+                <DialogTitle>設定與資訊</DialogTitle>
+                <DialogDescription>個人化您的演唱體驗與檢視系統需求。</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 py-2">
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase flex items-center gap-1 opacity-70">
-                    <Type className="w-3 h-3" /> 字體大小
-                  </Label>
-                  <Select value={fontSize} onValueChange={setFontSize}>
-                    <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="sm">標準</SelectItem>
-                      <SelectItem value="md">中型</SelectItem>
-                      <SelectItem value="lg">大型</SelectItem>
-                      <SelectItem value="xl">巨型</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="space-y-6 py-2">
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold uppercase flex items-center gap-1 opacity-70">
+                      <Type className="w-3 h-3" /> 字體大小
+                    </Label>
+                    <Select value={fontSize} onValueChange={setFontSize}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sm">標準</SelectItem>
+                        <SelectItem value="md">中型</SelectItem>
+                        <SelectItem value="lg">大型</SelectItem>
+                        <SelectItem value="xl">巨型</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold uppercase flex items-center gap-1 opacity-70">
+                      <Palette className="w-3 h-3" /> 歌詞顏色
+                    </Label>
+                    <Select value={activeColor} onValueChange={setActiveColor}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="secondary">活力青</SelectItem>
+                        <SelectItem value="white">極致白</SelectItem>
+                        <SelectItem value="yellow">亮麗黃</SelectItem>
+                        <SelectItem value="green">嫩草綠</SelectItem>
+                        <SelectItem value="pink">浪漫粉</SelectItem>
+                        <SelectItem value="cyan">星空藍</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[10px] font-bold uppercase flex items-center gap-1 opacity-70">
+                      <Layout className="w-3 h-3" /> 背景主題
+                    </Label>
+                    <Select value={bgTheme} onValueChange={setBgTheme}>
+                      <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="slate-900">經典深藍</SelectItem>
+                        <SelectItem value="black">極緻純黑</SelectItem>
+                        <SelectItem value="indigo-950">午夜藍調</SelectItem>
+                        <SelectItem value="zinc-900">深邃灰質</SelectItem>
+                        <SelectItem value="rose-950">暗影玫瑰</SelectItem>
+                        <SelectItem value="emerald-950">翡翠綠</SelectItem>
+                        <SelectItem value="purple-950">幻影紫</SelectItem>
+                        <SelectItem value="slate-950">星空藍</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase flex items-center gap-1 opacity-70">
-                    <Palette className="w-3 h-3" /> 歌詞顏色
-                  </Label>
-                  <Select value={activeColor} onValueChange={setActiveColor}>
-                    <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="secondary">活力青</SelectItem>
-                      <SelectItem value="white">極致白</SelectItem>
-                      <SelectItem value="yellow">亮麗黃</SelectItem>
-                      <SelectItem value="green">嫩草綠</SelectItem>
-                      <SelectItem value="pink">浪漫粉</SelectItem>
-                      <SelectItem value="cyan">星空藍</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-[10px] font-bold uppercase flex items-center gap-1 opacity-70">
-                    <Layout className="w-3 h-3" /> 背景主題
-                  </Label>
-                  <Select value={bgTheme} onValueChange={setBgTheme}>
-                    <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="slate-900">經典深藍</SelectItem>
-                      <SelectItem value="black">極緻純黑</SelectItem>
-                      <SelectItem value="indigo-950">午夜藍調</SelectItem>
-                      <SelectItem value="zinc-900">深邃灰質</SelectItem>
-                      <SelectItem value="rose-950">暗影玫瑰</SelectItem>
-                      <SelectItem value="emerald-950">翡翠綠</SelectItem>
-                      <SelectItem value="purple-950">幻影紫</SelectItem>
-                      <SelectItem value="slate-950">星空藍</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-primary">
+                    <Cpu className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase tracking-wider">硬體要求 (系統建議)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-[10px] bg-muted/30 p-3 rounded-lg border border-border/50">
+                    <div className="space-y-1">
+                      <p className="font-bold opacity-60">處理器</p>
+                      <p>雙核心以上</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-bold opacity-60">記憶體</p>
+                      <p>至少 2GB RAM</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-bold opacity-60">連線</p>
+                      <p>AI 功能需網路</p>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-bold opacity-60">系統</p>
+                      <p>Android 8.0+</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </DialogContent>
@@ -536,6 +568,10 @@ export default function LyricSyncApp() {
             <div className="h-full flex flex-col items-center justify-center opacity-20 p-8">
               <Music className="w-10 h-10 mb-2" />
               <p className="text-[10px] uppercase font-bold tracking-widest">請新增或選擇歌曲</p>
+              <div className="mt-4 flex items-center gap-2 text-[9px] uppercase tracking-tighter">
+                <Info className="w-3 h-3" />
+                建議 4GB RAM 以上以獲得最佳 AI 體驗
+              </div>
             </div>
           )}
         </Card>
