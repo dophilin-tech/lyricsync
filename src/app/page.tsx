@@ -67,6 +67,7 @@ interface Track extends Omit<TrackData, 'mp3Blob'> {
 }
 
 export default function LyricSyncApp() {
+  // 所有的 Hooks 必須在組件最上方無條件調用
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -96,19 +97,30 @@ export default function LyricSyncApp() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lyricScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // 1. Initial State Load
+  // 1. 環境偵測與設定讀取
   useEffect(() => {
+    // 偵測是否在 iframe 中（開發預覽環境）
+    const inIframe = window.self !== window.top;
+    // 偵測是否為原生 APK 或 PWA 獨立模式
+    const isStandalone = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches || (window as any).Capacitor;
+    
+    // 如果是原生環境或獨立模式，直接進入 App
+    if (!inIframe || isStandalone) {
+      setIsIframe(false);
+      setIsAppLaunched(true);
+    } else {
+      setIsIframe(true);
+    }
+
     const savedFontSize = localStorage.getItem('lyricSync_fontSize');
     const savedActiveColor = localStorage.getItem('lyricSync_activeColor');
     const savedBgTheme = localStorage.getItem('lyricSync_bgTheme');
     if (savedFontSize) setFontSize(savedFontSize);
     if (savedActiveColor) setActiveColor(savedActiveColor);
     if (savedBgTheme) setBgTheme(savedBgTheme);
-    
-    setIsIframe(window.self !== window.top);
   }, []);
 
-  // 2. Persistence Sync
+  // 2. 設定儲存
   useEffect(() => {
     localStorage.setItem('lyricSync_fontSize', fontSize);
     localStorage.setItem('lyricSync_activeColor', activeColor);
@@ -126,7 +138,7 @@ export default function LyricSyncApp() {
     }
   }, [wakeLock]);
 
-  // 3. Wake Lock Management
+  // 3. 螢幕鎖定管理
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && isPlaying) await requestWakeLock();
@@ -144,14 +156,7 @@ export default function LyricSyncApp() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isPlaying, requestWakeLock, wakeLock]);
 
-  // 4. Fullscreen State
-  useEffect(() => {
-    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
-
-  // 5. DB Load
+  // 4. 資料庫載入
   useEffect(() => {
     const loadTracks = async () => {
       try {
@@ -180,17 +185,11 @@ export default function LyricSyncApp() {
     loadTracks();
   }, []);
 
-  // 6. Volume Effect
-  useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = volume;
-  }, [volume]);
+  // 5. 歌詞自動捲動
+  const activeLyricIndex = currentTrackIndex >= 0 
+    ? playlist[currentTrackIndex]?.parsedLrc?.findLastIndex(l => l.time <= (currentTime - syncOffset)) ?? -1 
+    : -1;
 
-  // Current State Derived
-  const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
-  const adjustedCurrentTime = currentTime - syncOffset;
-  const activeLyricIndex = currentTrack?.parsedLrc?.findLastIndex(l => l.time <= adjustedCurrentTime) ?? -1;
-
-  // 7. Lyric Auto-Scroll
   useEffect(() => {
     if (lyricScrollRef.current && activeLyricIndex !== -1) {
       const activeEl = lyricScrollRef.current.children[activeLyricIndex] as HTMLElement;
@@ -198,56 +197,7 @@ export default function LyricSyncApp() {
     }
   }, [activeLyricIndex]);
 
-  const getFontSizeClass = () => {
-    switch (fontSize) {
-      case 'sm': return 'text-xl md:text-2xl';
-      case 'md': return 'text-2xl md:text-3xl';
-      case 'lg': return 'text-3xl md:text-5xl';
-      case 'xl': return 'text-4xl md:text-7xl';
-      default: return 'text-2xl md:text-3xl';
-    }
-  };
-
-  const getActiveColorClass = () => {
-    switch (activeColor) {
-      case 'secondary': return 'text-secondary';
-      case 'white': return 'text-white';
-      case 'yellow': return 'text-yellow-400';
-      case 'green': return 'text-green-400';
-      case 'pink': return 'text-pink-400';
-      case 'cyan': return 'text-cyan-400';
-      default: return 'text-secondary';
-    }
-  };
-
-  const getBgThemeClass = () => {
-    switch (bgTheme) {
-      case 'slate-900': return 'bg-slate-900';
-      case 'black': return 'bg-black';
-      case 'indigo-950': return 'bg-indigo-950';
-      case 'zinc-900': return 'bg-zinc-900';
-      case 'rose-950': return 'bg-rose-950';
-      case 'emerald-950': return 'bg-[#064e3b]';
-      case 'purple-950': return 'bg-[#3b0764]';
-      case 'slate-950': return 'bg-[#020617]';
-      default: return 'bg-slate-900';
-    }
-  };
-
-  const getThemeHex = () => {
-    switch (bgTheme) {
-      case 'slate-900': return '#0f172a';
-      case 'black': return '#000000';
-      case 'indigo-950': return '#1e1b4b';
-      case 'zinc-900': return '#18181b';
-      case 'rose-950': return '#450a0a';
-      case 'emerald-950': return '#064e3b';
-      case 'purple-950': return '#3b0764';
-      case 'slate-950': return '#020617';
-      default: return '#0f172a';
-    }
-  };
-
+  // 播放控制
   const playTrack = async (index: number) => {
     if (index < 0 || index >= playlist.length || !audioRef.current) return;
     const track = playlist[index];
@@ -355,6 +305,46 @@ export default function LyricSyncApp() {
     }
   };
 
+  // 樣式輔助函式
+  const getFontSizeClass = () => {
+    switch (fontSize) {
+      case 'sm': return 'text-xl md:text-2xl';
+      case 'md': return 'text-2xl md:text-3xl';
+      case 'lg': return 'text-3xl md:text-5xl';
+      case 'xl': return 'text-4xl md:text-7xl';
+      default: return 'text-2xl md:text-3xl';
+    }
+  };
+
+  const getActiveColorClass = () => {
+    switch (activeColor) {
+      case 'secondary': return 'text-secondary';
+      case 'white': return 'text-white';
+      case 'yellow': return 'text-yellow-400';
+      case 'green': return 'text-green-400';
+      case 'pink': return 'text-pink-400';
+      case 'cyan': return 'text-cyan-400';
+      default: return 'text-secondary';
+    }
+  };
+
+  const getBgThemeClass = () => {
+    switch (bgTheme) {
+      case 'slate-900': return 'bg-slate-900';
+      case 'black': return 'bg-black';
+      case 'indigo-950': return 'bg-indigo-950';
+      case 'zinc-900': return 'bg-zinc-900';
+      case 'rose-950': return 'bg-rose-950';
+      case 'emerald-950': return 'bg-[#064e3b]';
+      case 'purple-950': return 'bg-[#3b0764]';
+      case 'slate-950': return 'bg-[#020617]';
+      default: return 'bg-slate-900';
+    }
+  };
+
+  const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
+
+  // 啟動畫面邏輯
   if (isIframe && !isAppLaunched) {
     return (
       <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center">
@@ -363,7 +353,7 @@ export default function LyricSyncApp() {
         </div>
         <h1 className="text-3xl font-bold text-white mb-2">LyricSync</h1>
         <p className="text-slate-400 max-w-xs mb-10 text-sm">
-          偵測到您正在預覽環境中。請開啟獨立網頁以獲得完整的螢幕權限。
+          為了獲得完整的螢幕權限與最佳音質，請點擊下方按鈕啟動獨立網頁。
         </p>
         <Button 
           size="lg" 
@@ -410,14 +400,14 @@ export default function LyricSyncApp() {
                 </div>
                 <div className="grid gap-1.5">
                   <Label className="text-[10px] font-bold uppercase flex items-center gap-1">
-                    <FileText className="w-3 h-3" /> 3. 歌詞 (.txt 或 貼上)
+                    <FileText className="w-3 h-3" /> 3. 歌詞來源 (.txt)
                   </Label>
                   <Input type="file" accept=".txt" onChange={handleLyricsFileChange} className="h-8 text-[10px]" />
                   <textarea 
                     className="flex min-h-[120px] w-full rounded-md border bg-background px-3 py-2 text-xs"
                     value={newLyricsText}
                     onChange={e => setNewLyricsText(e.target.value)}
-                    placeholder="不填寫則由 AI 自動聽寫..."
+                    placeholder="或在此貼上歌詞內容，不填寫則由 AI 自動聽寫..."
                   />
                 </div>
               </div>
@@ -511,7 +501,7 @@ export default function LyricSyncApp() {
               <div 
                 ref={lyricScrollRef} 
                 onDoubleClick={togglePlay}
-                className="flex-1 overflow-y-auto no-scrollbar pt-[8%] pb-12 px-6 cursor-pointer"
+                className="flex-1 overflow-y-auto no-scrollbar pt-[5%] pb-12 px-6 cursor-pointer"
               >
                 {currentTrack.parsedLrc?.map((line, i) => (
                   <div 
@@ -529,7 +519,7 @@ export default function LyricSyncApp() {
                 ))}
               </div>
 
-              {/* Mobile Playback Controls - Integrated Bottom Bar to avoid blocking lyrics */}
+              {/* Mobile Playback Controls - Integrated Bottom Bar */}
               <div className="shrink-0 bg-black/40 backdrop-blur-md px-4 py-2 flex justify-between items-center border-t border-white/10">
                  <div className="flex items-center gap-3">
                    <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={() => skipTrack('prev')}>
@@ -546,7 +536,6 @@ export default function LyricSyncApp() {
                    {formatTime(currentTime)} / {formatTime(duration)}
                  </div>
               </div>
-              <div className="absolute top-0 left-0 right-0 h-12 pointer-events-none" style={{ background: `linear-gradient(to bottom, ${getThemeHex()}, transparent)` }} />
             </div>
           ) : (
             <div className="h-full flex flex-col items-center justify-center opacity-20 p-8">
@@ -586,6 +575,7 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
+        {/* Desktop Sidebar */}
         <Card className="hidden lg:flex lg:flex-[3] flex-col border-none shadow-lg bg-card/80 backdrop-blur-md p-4 space-y-6">
           {currentTrack ? (
             <>

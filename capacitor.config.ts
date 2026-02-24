@@ -6,9 +6,9 @@ const config: CapacitorConfig = {
   appName: 'LyricSync',
   webDir: 'out',
   server: {
-    // 這裡應填入您部署後的 Firebase App Hosting 網址，以便在手機上使用 AI 功能
-    url: 'https://your-firebase-app-url.web.app',
-    allowNavigation: ['your-firebase-app-url.web.app']
+    // 當您部署到 Firebase 後，請將此處替換為您的正式網址，以便在 APK 中正常使用 AI 功能
+    androidScheme: 'https',
+    allowNavigation: ['*']
   }
 };
 
