@@ -67,7 +67,6 @@ interface Track extends Omit<TrackData, 'mp3Blob'> {
 }
 
 export default function LyricSyncApp() {
-  // 所有的 Hooks 必須在組件最上方無條件調用
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -85,7 +84,6 @@ export default function LyricSyncApp() {
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
 
-  // Settings with Persistence
   const [fontSize, setFontSize] = useState<string>("md");
   const [activeColor, setActiveColor] = useState<string>("secondary");
   const [bgTheme, setBgTheme] = useState<string>("slate-900");
@@ -97,14 +95,10 @@ export default function LyricSyncApp() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lyricScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // 1. 環境偵測與設定讀取
   useEffect(() => {
-    // 偵測是否在 iframe 中（開發預覽環境）
     const inIframe = window.self !== window.top;
-    // 偵測是否為原生 APK 或 PWA 獨立模式
     const isStandalone = (window.navigator as any).standalone || window.matchMedia('(display-mode: standalone)').matches || (window as any).Capacitor;
     
-    // 如果是原生環境或獨立模式，直接進入 App
     if (!inIframe || isStandalone) {
       setIsIframe(false);
       setIsAppLaunched(true);
@@ -120,7 +114,6 @@ export default function LyricSyncApp() {
     if (savedBgTheme) setBgTheme(savedBgTheme);
   }, []);
 
-  // 2. 設定儲存
   useEffect(() => {
     localStorage.setItem('lyricSync_fontSize', fontSize);
     localStorage.setItem('lyricSync_activeColor', activeColor);
@@ -138,7 +131,6 @@ export default function LyricSyncApp() {
     }
   }, [wakeLock]);
 
-  // 3. 螢幕鎖定管理
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && isPlaying) await requestWakeLock();
@@ -156,7 +148,6 @@ export default function LyricSyncApp() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isPlaying, requestWakeLock, wakeLock]);
 
-  // 4. 資料庫載入
   useEffect(() => {
     const loadTracks = async () => {
       try {
@@ -185,7 +176,6 @@ export default function LyricSyncApp() {
     loadTracks();
   }, []);
 
-  // 5. 歌詞自動捲動
   const activeLyricIndex = currentTrackIndex >= 0 
     ? playlist[currentTrackIndex]?.parsedLrc?.findLastIndex(l => l.time <= (currentTime - syncOffset)) ?? -1 
     : -1;
@@ -197,7 +187,6 @@ export default function LyricSyncApp() {
     }
   }, [activeLyricIndex]);
 
-  // 播放控制
   const playTrack = async (index: number) => {
     if (index < 0 || index >= playlist.length || !audioRef.current) return;
     const track = playlist[index];
@@ -305,7 +294,6 @@ export default function LyricSyncApp() {
     }
   };
 
-  // 樣式輔助函式
   const getFontSizeClass = () => {
     switch (fontSize) {
       case 'sm': return 'text-xl md:text-2xl';
@@ -344,7 +332,6 @@ export default function LyricSyncApp() {
 
   const currentTrack = currentTrackIndex >= 0 ? playlist[currentTrackIndex] : null;
 
-  // 啟動畫面邏輯
   if (isIframe && !isAppLaunched) {
     return (
       <div className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center justify-center p-8 text-center">
@@ -519,7 +506,6 @@ export default function LyricSyncApp() {
                 ))}
               </div>
 
-              {/* Mobile Playback Controls - Integrated Bottom Bar */}
               <div className="shrink-0 bg-black/40 backdrop-blur-md px-4 py-2 flex justify-between items-center border-t border-white/10">
                  <div className="flex items-center gap-3">
                    <Button variant="ghost" size="icon" className="h-8 w-8 text-white" onClick={() => skipTrack('prev')}>
@@ -575,7 +561,6 @@ export default function LyricSyncApp() {
           </ScrollArea>
         </Card>
 
-        {/* Desktop Sidebar */}
         <Card className="hidden lg:flex lg:flex-[3] flex-col border-none shadow-lg bg-card/80 backdrop-blur-md p-4 space-y-6">
           {currentTrack ? (
             <>

@@ -1,16 +1,24 @@
 
-# LyricSync - Stable Archive v1.0.0
+# LyricSync - 1.0.0 穩定封存版
 
-This is the archived stable version of the AI Powered Karaoke Player.
+這是一個專為 Android APK 與 PWA 體驗優化的 AI 卡拉 OK 播放器。
 
-## Finalized Features
-- **Mobile Optimized Layout**: 75% Lyrics display area / 25% Scrollable playlist.
-- **Double-Tap Control**: Quickly pause or play by double-tapping the lyric area.
-- **Non-Obstructive Controls**: Playback buttons moved to a dedicated bar to avoid blocking lyrics.
-- **AI Sync & Transcribe**: Automatic LRC generation if lyrics are missing.
-- **Persistent Settings**: Automatically remembers your Font Size, Active Color, and Background Theme.
-- **File Support**: Import lyrics directly from `.txt` files.
-- **PWA Ready**: Optimized for screen wake lock and full-screen experience.
+## 已完成核心功能
+- **行動版優化佈局**：頂部 75% 歌詞顯示，底部 25% 獨立滾動歌單。
+- **直覺控制**：歌詞區域支援「雙擊」切換播放/暫停，控制按鈕不擋歌詞。
+- **AI 聽寫與同步**：上傳 MP3 時若無歌詞，AI 會自動分析音軌產生同步的 LRC 檔案。
+- **設定記憶**：系統自動儲存「字體大小」、「歌詞顏色」、「背景主題」。
+- **APK/PWA 支援**：啟動時自動進入主介面，移除環境偵測限制。
 
-## Environment Note
-If using within a framed preview, use the "Launch App" button to gain necessary browser permissions for screen lock and audio playback.
+## 如何將 APK 分享給他人？
+1. **產出 APK**：
+   - 執行 `npm run cap:open:android` 開啟 Android Studio。
+   - 選擇 **Build > Build APK(s)**。
+2. **分享檔案**：
+   - 找到產出的 `app-debug.apk`。
+   - 透過 Google Drive 或通訊軟體傳送給朋友。
+3. **安裝提示**：
+   - 請對方在安裝時允許「安裝來自未知來源的應用程式」。
+
+## 建議分享方式 (網頁版)
+將 App 部署到 Firebase Hosting 後，直接分享網址。對方只要在手機瀏覽器點擊「新增至主螢幕」，就能獲得與 APK 相同的全螢幕體驗。
