@@ -1,7 +1,7 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: 'export', // 關鍵：讓 Next.js 輸出為靜態檔案，這是打包 APK 必須的
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -9,10 +9,11 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
+    unoptimized: true, // 關鍵：手機 App 不支援 Next.js 預設的圖片優化
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'placehold.co',
+        hostname: 'placeholder.co',
         port: '',
         pathname: '/**',
       },
@@ -29,11 +30,6 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
-  },
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '10mb',
-    },
   },
 };
 
