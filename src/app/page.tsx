@@ -21,7 +21,9 @@ import {
   Zap,
   Cpu,
   Info,
-  Globe
+  Globe,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -62,6 +64,7 @@ import { toast } from "@/hooks/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 import { saveTrackToDB, getAllTracksFromDB, deleteTrackFromDB, TrackData } from "@/lib/db";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Track extends Omit<TrackData, 'mp3Blob'> {
   audioUrl: string;
@@ -70,6 +73,7 @@ interface Track extends Omit<TrackData, 'mp3Blob'> {
 }
 
 export default function LyricSyncApp() {
+  const isMobile = useIsMobile();
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -86,6 +90,7 @@ export default function LyricSyncApp() {
   const [isAppLaunched, setIsAppLaunched] = useState(false);
   const [wakeLock, setWakeLock] = useState<any>(null);
   const [trackToDelete, setTrackToDelete] = useState<string | null>(null);
+  const [isPlaylistExpanded, setIsPlaylistExpanded] = useState(false);
 
   const [fontSize, setFontSize] = useState<string>("md");
   const [activeColor, setActiveColor] = useState<string>("secondary");
@@ -116,6 +121,10 @@ export default function LyricSyncApp() {
     if (savedFontSize) setFontSize(savedFontSize);
     if (savedActiveColor) setActiveColor(savedActiveColor);
     if (savedBgTheme) setBgTheme(savedBgTheme);
+
+    const fsHandler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', fsHandler);
+    return () => document.removeEventListener('fullscreenchange', fsHandler);
   }, []);
 
   useEffect(() => {
@@ -200,6 +209,16 @@ export default function LyricSyncApp() {
     }
   }, [currentTrackIndex]);
 
+  const toggleFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch (err) {
+        console.warn("Fullscreen request failed");
+      }
+    }
+  };
+
   const playTrack = async (index: number) => {
     if (index < 0 || index >= playlist.length || !audioRef.current) return;
     const track = playlist[index];
@@ -209,6 +228,10 @@ export default function LyricSyncApp() {
     try {
       await audioRef.current.play();
       requestWakeLock();
+      if (isMobile) {
+        toggleFullscreen();
+        setIsPlaylistExpanded(false);
+      }
     } catch (error) {
       console.warn("Playback failed:", error);
     }
@@ -220,7 +243,13 @@ export default function LyricSyncApp() {
       return;
     }
     if (audioRef.current.paused) {
-      audioRef.current.play().then(() => requestWakeLock()).catch(() => {});
+      audioRef.current.play().then(() => {
+        requestWakeLock();
+        if (isMobile) {
+          toggleFullscreen();
+          setIsPlaylistExpanded(false);
+        }
+      }).catch(() => {});
     } else {
       audioRef.current.pause();
     }
@@ -375,7 +404,7 @@ export default function LyricSyncApp() {
       <header className="flex justify-between items-center h-10 px-4 z-10 bg-background/80 backdrop-blur-sm shrink-0 border-b">
         <div className="flex items-center gap-2">
           <Music className="w-4 h-4 text-primary" />
-          <h1 className="text-sm font-bold tracking-tight text-primary">LyricSync 1.0.1</h1>
+          <h1 className="text-sm font-bold tracking-tight text-primary">LyricSync 1.0.2</h1>
         </div>
         <div className="flex items-center gap-1.5">
           <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
@@ -518,10 +547,13 @@ export default function LyricSyncApp() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+      <main className="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
         <Card 
           className={cn(
-            "flex-[3] lg:flex-[6] relative flex flex-col overflow-hidden border-none transition-colors duration-500 rounded-none h-3/4 lg:h-full",
+            "relative flex flex-col overflow-hidden border-none transition-all duration-500 rounded-none",
+            isMobile 
+              ? (isPlaylistExpanded ? "h-[20%]" : "h-[75%]") 
+              : "flex-[6] h-full",
             getBgThemeClass()
           )}
         >
@@ -569,15 +601,28 @@ export default function LyricSyncApp() {
             <div className="h-full flex flex-col items-center justify-center opacity-20 p-8">
               <Music className="w-10 h-10 mb-2" />
               <p className="text-[10px] uppercase font-bold tracking-widest">請新增或選擇歌曲</p>
-              <div className="mt-4 flex items-center gap-2 text-[9px] uppercase tracking-tighter">
-                <Info className="w-3 h-3" />
-                建議 4GB RAM 以上以獲得最佳 AI 體驗
-              </div>
             </div>
           )}
         </Card>
 
-        <Card className="flex-[1] lg:flex-[3] flex flex-col overflow-hidden border-none shadow-lg bg-card/50 backdrop-blur-md rounded-none h-1/4 lg:h-full">
+        <Card 
+          className={cn(
+            "flex flex-col overflow-hidden border-none shadow-lg bg-card/90 backdrop-blur-xl rounded-none transition-all duration-500 z-30",
+            isMobile 
+              ? (isPlaylistExpanded ? "h-[80%]" : "h-[25%]") 
+              : "flex-[3] h-full"
+          )}
+        >
+          {isMobile && !isPlaying && (
+            <div 
+              className="h-6 w-full flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => setIsPlaylistExpanded(!isPlaylistExpanded)}
+            >
+              <div className="w-12 h-1 bg-muted-foreground/30 rounded-full" />
+              {isPlaylistExpanded ? <ChevronDown className="w-4 h-4 ml-2 opacity-30" /> : <ChevronUp className="w-4 h-4 ml-2 opacity-30" />}
+            </div>
+          )}
+          
           <div className="p-2 border-b flex items-center justify-between bg-muted/30 shrink-0">
              <h2 className="text-[10px] font-bold flex items-center gap-1 uppercase tracking-wider">
                <ListMusic className="w-3 h-3 text-primary" /> 播放清單
