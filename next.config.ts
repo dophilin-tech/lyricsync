@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // 在瀏覽器端打包時，忽略 Node.js 內建模組，防止 async_hooks 等報錯
+      // 在瀏覽器端打包時，強制忽略 Node.js 內建模組，防止 async_hooks 等報錯
       config.resolve.fallback = {
         ...config.resolve.fallback,
         net: false,
@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
         child_process: false,
         async_hooks: false,
         os: false,
+        process: false,
+        util: false,
       };
     }
     return config;
