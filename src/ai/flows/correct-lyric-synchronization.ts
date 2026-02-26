@@ -1,4 +1,4 @@
-'use server';
+'use client';
 /**
  * @fileOverview An AI agent for correcting lyric synchronization in LRC files based on audio analysis.
  *

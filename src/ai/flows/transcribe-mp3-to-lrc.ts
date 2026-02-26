@@ -1,4 +1,4 @@
-'use server';
+'use client';
 /**
  * @fileOverview 此檔案實作了 AI 自動聽寫功能。當使用者僅提供 MP3 而無歌詞文字時，
  * 透過 Gemini 的多模態能力直接從音訊中擷取歌詞並生成標準 LRC 格式。
