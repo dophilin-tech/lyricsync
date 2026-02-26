@@ -1,7 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  output: 'export', // 關鍵：讓 Next.js 輸出為靜態檔案，這是打包 APK 必須的
+  // 移除 output: 'export' 以支援 Server Actions (AI 功能所需)
+  // 如果需要打包 APK，建議在部署到 Firebase 後將 Capacitor 指向正式網址
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -9,7 +10,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
-    unoptimized: true, // 關鍵：手機 App 不支援 Next.js 預設的圖片優化
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',
@@ -30,6 +31,24 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  // 強制將 Genkit 相關套件留在伺服器端處理
+  serverComponentsExternalPackages: ['genkit', '@genkit-ai/core', '@genkit-ai/google-genai'],
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // 在客戶端打包時，將 Node.js 內建模組導向空對象，避免編譯錯誤
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        async_hooks: false,
+        fs: false,
+        path: false,
+        os: false,
+        crypto: false,
+        stream: false,
+        vm: false,
+      };
+    }
+    return config;
   },
 };
 
