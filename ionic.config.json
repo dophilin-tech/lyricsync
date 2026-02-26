@@ -1,0 +1,7 @@
+{
+    "name": "LyricSync",
+    "integrations": {
+      "capacitor": {}
+    },
+    "type": "custom"
+  }
