@@ -1,51 +1,25 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // 移除 output: 'export' 以支援 Server Actions (AI 功能所需)
-  // 如果需要打包 APK，建議在部署到 Firebase 後將 Capacitor 指向正式網址
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // 為了支援 Server Actions (AI 聽寫功能)，我們不使用靜態導出 (output: 'export')
+  // 這樣才能在 Firebase App Hosting 上正常運行後端邏輯
+  serverExternalPackages: ['genkit', '@genkit-ai/google-genai', '@genkit-ai/core', '@genkit-ai/ai'],
   images: {
     unoptimized: true,
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'placeholder.co',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**',
-      },
-    ],
   },
-  // 強制將 Genkit 相關套件留在伺服器端處理
-  serverComponentsExternalPackages: ['genkit', '@genkit-ai/core', '@genkit-ai/google-genai'],
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // 在客戶端打包時，將 Node.js 內建模組導向空對象，避免編譯錯誤
+      // 在瀏覽器端打包時，忽略 Node.js 內建模組，防止 async_hooks 等報錯
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        async_hooks: false,
+        net: false,
+        dns: false,
+        tls: false,
         fs: false,
         path: false,
+        child_process: false,
+        async_hooks: false,
         os: false,
-        crypto: false,
-        stream: false,
-        vm: false,
       };
     }
     return config;
