@@ -1,15 +1,19 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // 為了支援 Server Actions (AI 聽寫功能)，我們不使用靜態導出 (output: 'export')
-  // 這樣才能在 Firebase App Hosting 上正常運行後端邏輯
+  // 關鍵 1：為了打包 APK，必須保留這個設定
+  output: 'export', 
+  
+  // 關鍵 2：原本針對 Firebase 的設定可以保留，不影響打包
   serverExternalPackages: ['genkit', '@genkit-ai/google-genai', '@genkit-ai/core', '@genkit-ai/ai'],
+  
   images: {
     unoptimized: true,
   },
+  
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // 在瀏覽器端打包時，強制忽略 Node.js 內建模組，防止 async_hooks 等報錯
+      // 關鍵 3：強化你的 Webpack fallback，把所有 Node.js 零件都擋住
       config.resolve.fallback = {
         ...config.resolve.fallback,
         net: false,
@@ -18,7 +22,7 @@ const nextConfig: NextConfig = {
         fs: false,
         path: false,
         child_process: false,
-        async_hooks: false,
+        async_hooks: false, // 你原本代碼中有的
         os: false,
         process: false,
         util: false,
