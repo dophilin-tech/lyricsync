@@ -1,4 +1,3 @@
-'use client';
 /**
  * @fileOverview This file implements a Genkit flow for generating synchronized LRC
  * (Lyrics Karaoke) files from an MP3 audio and its corresponding lyrics text.
